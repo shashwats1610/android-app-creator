@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { motion } from 'framer-motion';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { useMemo } from 'react';
 
 const container = {
   hidden: { opacity: 0 },
@@ -16,12 +18,53 @@ const item = {
   show: { opacity: 1, y: 0 },
 };
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 6) return 'Good night';
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function VolumeSparkline({ sessions }: { sessions: { date: string; totalVolume: number }[] }) {
+  const data = useMemo(() => {
+    const now = new Date();
+    const days: { day: string; vol: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const vol = sessions
+        .filter((s) => s.date === dateStr)
+        .reduce((sum, s) => sum + s.totalVolume, 0);
+      days.push({ day: format(d, 'EEE'), vol });
+    }
+    return days;
+  }, [sessions]);
+
+  const hasData = data.some((d) => d.vol > 0);
+  if (!hasData) return null;
+
+  return (
+    <ResponsiveContainer width="100%" height={32}>
+      <LineChart data={data}>
+        <Line
+          type="monotone"
+          dataKey="vol"
+          stroke="hsl(var(--primary))"
+          strokeWidth={1.5}
+          dot={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
   const { settings, workoutPlan, inProgressSession, dailyHydration, sessions, streak } = useAppStore();
 
   const today = format(new Date(), 'yyyy-MM-dd');
-  const dayOfWeek = new Date().getDay(); // 0=Sun
+  const dayOfWeek = new Date().getDay();
   const currentDay = workoutPlan.days[settings.currentDayIndex];
   const hydration = dailyHydration[today];
   const hydrationTotal = hydration?.total ?? 0;
@@ -37,7 +80,6 @@ export default function HomePage() {
     });
   };
 
-  const recentSessions = sessions.slice(0, 3);
   const totalVolThisWeek = sessions
     .filter((s) => {
       const d = new Date(s.date);
@@ -46,6 +88,12 @@ export default function HomePage() {
       return d >= weekAgo;
     })
     .reduce((sum, s) => sum + s.totalVolume, 0);
+
+  // Days since last workout
+  const lastSession = sessions[0];
+  const daysSinceLast = lastSession
+    ? Math.floor((Date.now() - new Date(lastSession.date).getTime()) / 86400000)
+    : null;
 
   return (
     <motion.div
@@ -57,19 +105,32 @@ export default function HomePage() {
       {/* Header */}
       <motion.div variants={item} className="flex items-end justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMM d')}</p>
+          <p className="text-sm text-muted-foreground">{getGreeting()} · {format(new Date(), 'EEEE, MMM d')}</p>
           <h1 className="font-display text-2xl font-bold tracking-tight">
             Hyper<span className="text-primary">trophy</span>
           </h1>
         </div>
         <div className="flex items-center gap-2">
           {streak > 0 && (
-            <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <motion.span
+              className="animate-flame-pulse rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary"
+            >
               🔥 {streak} day streak
-            </span>
+            </motion.span>
           )}
         </div>
       </motion.div>
+
+      {/* Last workout reminder */}
+      {daysSinceLast !== null && daysSinceLast > 2 && (
+        <motion.div variants={item}>
+          <div className="rounded-lg bg-muted/60 px-3 py-2 text-center">
+            <p className="text-xs text-muted-foreground">
+              Last workout was <span className="font-semibold text-foreground">{daysSinceLast} days ago</span> — time to train! 💪
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* In-progress recovery */}
       {inProgressSession && (
@@ -89,7 +150,7 @@ export default function HomePage() {
       )}
 
       {/* Today's Workout */}
-      <motion.div variants={item}>
+      <motion.div variants={item} whileTap={{ scale: 0.98 }}>
         <Card className="overflow-hidden card-glow">
           <CardContent className="p-0">
             <div className="bg-gradient-to-br from-primary/15 via-transparent to-transparent p-5">
@@ -102,7 +163,7 @@ export default function HomePage() {
                 {currentDay.exercises.length} exercises · {currentDay.focusMuscles.slice(0, 3).join(', ')}
               </p>
               <Button
-                className="mt-4 w-full touch-target text-base font-semibold"
+                className="mt-4 w-full touch-target text-base font-semibold active:scale-[0.98] transition-transform"
                 size="lg"
                 onClick={() => navigate('/workout')}
               >
@@ -115,29 +176,30 @@ export default function HomePage() {
 
       {/* Quick Stats Row */}
       <motion.div variants={item} className="grid grid-cols-3 gap-3">
-        <Card>
+        <Card className="card-elevated">
           <CardContent className="flex flex-col items-center p-3 text-center">
             <span className="text-lg font-bold font-display">{sessions.length}</span>
-            <span className="text-[10px] text-muted-foreground">Sessions</span>
+            <span className="text-[11px] text-muted-foreground">Sessions</span>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-elevated">
           <CardContent className="flex flex-col items-center p-3 text-center">
             <span className="text-lg font-bold font-display">{(totalVolThisWeek / 1000).toFixed(1)}k</span>
-            <span className="text-[10px] text-muted-foreground">Volume (wk)</span>
+            <span className="text-[11px] text-muted-foreground">Volume (wk)</span>
+            <VolumeSparkline sessions={sessions} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-elevated">
           <CardContent className="flex flex-col items-center p-3 text-center">
             <span className="text-lg font-bold font-display">{Object.values(useAppStore.getState().personalRecords).length}</span>
-            <span className="text-[10px] text-muted-foreground">PRs</span>
+            <span className="text-[11px] text-muted-foreground">PRs</span>
           </CardContent>
         </Card>
       </motion.div>
 
       {/* Hydration Widget */}
       <motion.div variants={item}>
-        <Card>
+        <Card className="card-elevated">
           <CardContent className="p-4">
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -148,14 +210,14 @@ export default function HomePage() {
                 {hydrationTotal}ml / {settings.hydrationGoal}ml
               </span>
             </div>
-            <Progress value={hydrationPct} className="mb-3 h-2" />
+            <Progress value={hydrationPct} className="mb-3 h-2" aria-label="Hydration progress" role="progressbar" aria-valuenow={hydrationPct} />
             <div className="flex gap-2">
               {[250, 500, 750].map((ml) => (
                 <Button
                   key={ml}
                   variant="outline"
                   size="sm"
-                  className="flex-1 touch-target text-xs"
+                  className="flex-1 touch-target text-xs active:scale-95 transition-transform"
                   onClick={() => quickAddWater(ml)}
                 >
                   <Plus className="mr-1 h-3 w-3" />
@@ -190,7 +252,7 @@ export default function HomePage() {
       {/* Nav Cards */}
       <motion.div variants={item} className="grid grid-cols-2 gap-3">
         <Card
-          className="cursor-pointer transition-colors hover:bg-accent/50"
+          className="cursor-pointer card-elevated transition-all hover:bg-accent/50 active:scale-[0.97]"
           onClick={() => navigate('/records')}
         >
           <CardContent className="flex flex-col items-center gap-2 p-4">
@@ -199,7 +261,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
         <Card
-          className="cursor-pointer transition-colors hover:bg-accent/50"
+          className="cursor-pointer card-elevated transition-all hover:bg-accent/50 active:scale-[0.97]"
           onClick={() => navigate('/nutrition')}
         >
           <CardContent className="flex flex-col items-center gap-2 p-4">

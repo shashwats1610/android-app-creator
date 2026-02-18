@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
@@ -66,6 +67,7 @@ function formatDuration(startTime: string, endTime?: string) {
 }
 
 export default function HistoryPage() {
+  const navigate = useNavigate();
   const { sessions, workoutPlan } = useAppStore();
   const [selectedSession, setSelectedSession] = useState<WorkoutSession | null>(null);
 
@@ -83,9 +85,14 @@ export default function HistoryPage() {
 
         {sessions.length === 0 && (
           <motion.div variants={item} className="flex flex-col items-center justify-center py-16 text-center">
-            <Calendar className="mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No sessions yet.</p>
-            <p className="text-xs text-muted-foreground">Complete a workout to see your history here.</p>
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+              <Calendar className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">No workouts yet</p>
+            <p className="mt-1 max-w-[240px] text-xs text-muted-foreground/70">Start your first session to see your training history here.</p>
+            <Button size="sm" className="mt-4 touch-target" onClick={() => navigate('/workout')}>
+              Start a Workout
+            </Button>
           </motion.div>
         )}
 
