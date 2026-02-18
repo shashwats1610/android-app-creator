@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/useAppStore';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,13 +10,14 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger,
 } from '@/components/ui/sheet';
 import {
-  ChevronLeft, ChevronRight, Check, Timer, Info, Droplets, Plus, Minus, SkipForward, X, Trophy,
+  ChevronLeft, ChevronRight, Check, Timer, Info, Droplets, Plus, Minus,
+  SkipForward, X, Trophy, AlertCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import type { LoggedSet, WorkoutSession, InProgressSession } from '@/types/workout';
 
-// ========== REST TIMER COMPONENT ==========
+// ========== REST TIMER ==========
 function RestTimer({
   seconds,
   onDone,
@@ -30,18 +31,17 @@ function RestTimer({
   const [adjustedTotal, setAdjustedTotal] = useState(seconds);
 
   useEffect(() => {
-    setRemaining(seconds);
-    setAdjustedTotal(seconds);
-  }, [seconds]);
+    if (remaining <= 0) return;
+    const t = setTimeout(() => setRemaining((r) => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [remaining]);
 
   useEffect(() => {
     if (remaining <= 0) {
       onDone();
-      return;
     }
-    const t = setTimeout(() => setRemaining((r) => r - 1), 1000);
-    return () => clearTimeout(t);
-  }, [remaining, onDone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining]);
 
   const adjust = (delta: number) => {
     setRemaining((r) => Math.max(0, r + delta));
@@ -83,12 +83,13 @@ function RestTimer({
 // ========== RPE SELECTOR ==========
 function RPESelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex gap-1">
+    <div className="flex flex-wrap gap-1">
       {[6, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((rpe) => (
         <button
           key={rpe}
+          type="button"
           onClick={() => onChange(rpe)}
-          className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+          className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             value === rpe
               ? 'bg-primary text-primary-foreground'
               : 'bg-muted text-muted-foreground hover:bg-accent'
@@ -129,25 +130,27 @@ function SessionTimer({ startTime }: { startTime: string }) {
 // ========== MAIN SESSION PAGE ==========
 export default function SessionPage() {
   const navigate = useNavigate();
-  const {
-    inProgressSession,
-    updateInProgressSession,
-    completeSession,
-    clearInProgressSession,
-    workoutPlan,
-    settings,
-    addHydrationEntry,
-    updatePersonalRecord,
-    personalRecords,
-    advanceDay,
-  } = useAppStore();
+
+  // Subscribe to store slices individually so component re-renders on any change
+  const inProgressSession = useAppStore((s) => s.inProgressSession);
+  const workoutPlan = useAppStore((s) => s.workoutPlan);
+  const settings = useAppStore((s) => s.settings);
+  const personalRecords = useAppStore((s) => s.personalRecords);
+
+  const updateInProgressSession = useAppStore((s) => s.updateInProgressSession);
+  const completeSession = useAppStore((s) => s.completeSession);
+  const clearInProgressSession = useAppStore((s) => s.clearInProgressSession);
+  const addHydrationEntry = useAppStore((s) => s.addHydrationEntry);
+  const updatePersonalRecord = useAppStore((s) => s.updatePersonalRecord);
+  const advanceDay = useAppStore((s) => s.advanceDay);
 
   const [showRest, setShowRest] = useState(false);
   const [restSeconds, setRestSeconds] = useState(90);
   const [showPR, setShowPR] = useState<string | null>(null);
   const [currentWeight, setCurrentWeight] = useState('');
   const [currentReps, setCurrentReps] = useState('');
-  const [currentRPE, setCurrentRPE] = useState(8);
+  const [currentRPE, setCurrentRPE] = useState<number>(8);
+  const [validationError, setValidationError] = useState('');
 
   // Redirect if no session
   if (!inProgressSession) {
@@ -161,7 +164,14 @@ export default function SessionPage() {
 
   const { session, currentExerciseIndex } = inProgressSession;
   const day = workoutPlan.days.find((d) => d.id === session.dayId);
-  if (!day) return null;
+  if (!day) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
+        <p className="text-muted-foreground">Workout day not found</p>
+        <Button onClick={() => { clearInProgressSession(); navigate('/workout'); }}>Go to Workouts</Button>
+      </div>
+    );
+  }
 
   const exercise = day.exercises[currentExerciseIndex];
   const loggedExercise = session.exercises[currentExerciseIndex];
@@ -171,47 +181,79 @@ export default function SessionPage() {
   const overallProgress = session.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
   const overallTotal = day.exercises.reduce((sum, ex) => sum + ex.sets, 0);
 
-  // Check if we should show hydration reminder (every 3-4 sets)
-  const showHydrationReminder = overallProgress > 0 && overallProgress % 4 === 0;
+  const isBodyweight = exercise.type === 'bodyweight';
+  const isTimed = exercise.type === 'timed';
+  const isUnilateral = exercise.type === 'unilateral';
+
+  // Hydration reminder every 4 sets
+  const showHydrationReminder = overallProgress > 0 && overallProgress % 4 === 0 && !allSetsComplete;
 
   const handleLogSet = () => {
+    setValidationError('');
+
     const weight = parseFloat(currentWeight) || 0;
     const reps = parseInt(currentReps) || 0;
-    if (reps === 0) return;
+
+    // Validation
+    if (!isTimed && !isBodyweight && weight <= 0) {
+      setValidationError('Enter weight (kg)');
+      return;
+    }
+    if (isTimed && reps <= 0) {
+      setValidationError('Enter duration (seconds)');
+      return;
+    }
+    if (!isTimed && reps <= 0) {
+      setValidationError('Enter reps');
+      return;
+    }
+    if (!isTimed && reps > 100) {
+      setValidationError('Reps seem too high — double check');
+      return;
+    }
+    if (!isBodyweight && !isTimed && weight > 500) {
+      setValidationError('Weight seems too high — double check');
+      return;
+    }
+
+    // Read latest session from store to avoid stale closure
+    const latest = useAppStore.getState().inProgressSession;
+    if (!latest) return;
+
+    const latestLoggedExercise = latest.session.exercises[currentExerciseIndex];
+    const latestCompletedSets = latestLoggedExercise?.sets?.length ?? 0;
 
     const newSet: LoggedSet = {
-      setNumber: completedSets + 1,
-      weight,
+      setNumber: latestCompletedSets + 1,
+      weight: isBodyweight ? 0 : weight,
       reps,
       rpe: currentRPE,
       completed: true,
       timestamp: new Date().toISOString(),
     };
 
-    const updatedExercises = [...session.exercises];
+    const updatedExercises = [...latest.session.exercises];
     updatedExercises[currentExerciseIndex] = {
-      ...loggedExercise,
-      sets: [...loggedExercise.sets, newSet],
+      ...latestLoggedExercise,
+      sets: [...latestLoggedExercise.sets, newSet],
     };
 
-    // Check PR
-    const volume = weight * reps;
-    const pr = personalRecords[exercise.id];
-    let isPR = false;
-    if (weight > 0) {
-      if (!pr || weight > pr.bestWeight || volume > pr.bestVolume) {
-        isPR = true;
+    // Check PR (only for weighted exercises)
+    const volume = newSet.weight * newSet.reps;
+    if (newSet.weight > 0) {
+      const pr = useAppStore.getState().personalRecords[exercise.id];
+      if (!pr || newSet.weight > pr.bestWeight || volume > pr.bestVolume || newSet.reps > pr.bestReps) {
         const today = new Date().toISOString().split('T')[0];
         updatePersonalRecord(exercise.id, {
           exerciseId: exercise.id,
           exerciseName: exercise.name,
-          bestWeight: Math.max(weight, pr?.bestWeight ?? 0),
-          bestWeightDate: weight > (pr?.bestWeight ?? 0) ? today : pr?.bestWeightDate ?? today,
-          bestReps: Math.max(reps, pr?.bestReps ?? 0),
-          bestRepsDate: reps > (pr?.bestReps ?? 0) ? today : pr?.bestRepsDate ?? today,
+          bestWeight: Math.max(newSet.weight, pr?.bestWeight ?? 0),
+          bestWeightDate: newSet.weight > (pr?.bestWeight ?? 0) ? today : pr?.bestWeightDate ?? today,
+          bestReps: Math.max(newSet.reps, pr?.bestReps ?? 0),
+          bestRepsDate: newSet.reps > (pr?.bestReps ?? 0) ? today : pr?.bestRepsDate ?? today,
           bestVolume: Math.max(volume, pr?.bestVolume ?? 0),
           bestVolumeDate: volume > (pr?.bestVolume ?? 0) ? today : pr?.bestVolumeDate ?? today,
-          history: [...(pr?.history ?? []), { date: today, weight, reps, rpe: currentRPE }],
+          history: [...(pr?.history ?? []), { date: today, weight: newSet.weight, reps: newSet.reps, rpe: currentRPE }],
         });
         updatedExercises[currentExerciseIndex].personalRecord = true;
         setShowPR(exercise.name);
@@ -226,26 +268,24 @@ export default function SessionPage() {
     const totalSetsLogged = updatedExercises.reduce((sum, ex) => sum + ex.sets.length, 0);
 
     const updatedSession: WorkoutSession = {
-      ...session,
+      ...latest.session,
       exercises: updatedExercises,
       totalVolume,
       totalSets: totalSetsLogged,
       prsHit: updatedExercises.filter((e) => e.personalRecord).length,
     };
 
-    const updatedInProgress: InProgressSession = {
-      ...inProgressSession,
+    updateInProgressSession({
+      ...latest,
       session: updatedSession,
-    };
+    });
 
-    updateInProgressSession(updatedInProgress);
-
-    // Reset inputs
+    // Reset reps but keep weight for convenience
     setCurrentReps('');
-    // Keep weight for next set convenience
+    setValidationError('');
 
-    // Start rest timer if not last set
-    if (completedSets + 1 < totalSets) {
+    // Start rest timer if not last set of this exercise
+    if (latestCompletedSets + 1 < totalSets) {
       const overrideRest = settings.restTimerOverrides[exercise.id];
       setRestSeconds(overrideRest ?? exercise.restSeconds);
       setShowRest(true);
@@ -254,18 +294,23 @@ export default function SessionPage() {
 
   const goToExercise = (idx: number) => {
     if (idx < 0 || idx >= day.exercises.length) return;
+    const latest = useAppStore.getState().inProgressSession;
+    if (!latest) return;
     updateInProgressSession({
-      ...inProgressSession,
+      ...latest,
       currentExerciseIndex: idx,
     });
     setCurrentWeight('');
     setCurrentReps('');
     setCurrentRPE(8);
+    setValidationError('');
   };
 
   const handleFinishSession = () => {
+    const latest = useAppStore.getState().inProgressSession;
+    if (!latest) return;
     const finalSession: WorkoutSession = {
-      ...session,
+      ...latest.session,
       endTime: new Date().toISOString(),
       completed: true,
     };
@@ -281,6 +326,12 @@ export default function SessionPage() {
     }
   };
 
+  // Suggested weight from last session for this exercise
+  const lastSessionForDay = useAppStore.getState().sessions.find((s) => s.dayId === session.dayId);
+  const lastLoggedExercise = lastSessionForDay?.exercises.find((e) => e.exerciseId === exercise.id);
+  const lastSetWeight = lastLoggedExercise?.sets?.[lastLoggedExercise.sets.length - 1]?.weight;
+  const lastSetReps = lastLoggedExercise?.sets?.[lastLoggedExercise.sets.length - 1]?.reps;
+
   return (
     <>
       <div className="flex min-h-screen flex-col bg-background">
@@ -288,7 +339,7 @@ export default function SessionPage() {
         <div className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-lg px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={handleAbandon} className="touch-target">
+              <button type="button" onClick={handleAbandon} className="touch-target">
                 <X className="h-5 w-5 text-muted-foreground" />
               </button>
               <div>
@@ -300,12 +351,12 @@ export default function SessionPage() {
               <span className="text-xs text-muted-foreground">
                 {overallProgress}/{overallTotal} sets
               </span>
-              <Progress value={(overallProgress / overallTotal) * 100} className="h-1.5 w-16" />
+              <Progress value={overallTotal > 0 ? (overallProgress / overallTotal) * 100 : 0} className="h-1.5 w-16" />
             </div>
           </div>
         </div>
 
-        {/* Exercise Navigation */}
+        {/* Exercise Navigation Pills */}
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 scrollbar-hide">
           {day.exercises.map((ex, idx) => {
             const logged = session.exercises[idx]?.sets?.length ?? 0;
@@ -315,8 +366,9 @@ export default function SessionPage() {
             return (
               <button
                 key={ex.id}
+                type="button"
                 onClick={() => goToExercise(idx)}
-                className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-medium transition-colors ${
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium transition-colors ${
                   active
                     ? 'bg-primary text-primary-foreground'
                     : done
@@ -334,7 +386,7 @@ export default function SessionPage() {
         <div className="flex-1 px-4 pb-32">
           <AnimatePresence mode="wait">
             <motion.div
-              key={exercise.id}
+              key={`${exercise.id}-${currentExerciseIndex}`}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -351,20 +403,26 @@ export default function SessionPage() {
                             {mg.replace('_', ' ')}
                           </span>
                         ))}
-                        {exercise.type !== 'bilateral' && (
-                          <Badge variant="outline" className="text-[10px]">{exercise.type}</Badge>
-                        )}
+                        {isUnilateral && <Badge variant="outline" className="text-[10px]">Per side</Badge>}
+                        {isTimed && <Badge variant="outline" className="text-[10px]">Timed</Badge>}
+                        {isBodyweight && <Badge variant="outline" className="text-[10px]">Bodyweight</Badge>}
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {exercise.sets} sets × {exercise.type === 'timed'
+                        {exercise.sets} sets × {isTimed
                           ? `${exercise.repRangeMin}-${exercise.repRangeMax}s`
                           : `${exercise.repRangeMin}-${exercise.repRangeMax} reps`}
                         {' · '}Rest {exercise.restSeconds}s
                       </p>
+                      {/* Last session reference */}
+                      {lastSetWeight !== undefined && (
+                        <p className="mt-1 text-[10px] text-primary/70">
+                          Last session: {lastSetWeight}kg × {lastSetReps} reps
+                        </p>
+                      )}
                     </div>
                     <Sheet>
                       <SheetTrigger asChild>
-                        <button className="touch-target text-muted-foreground hover:text-foreground">
+                        <button type="button" className="touch-target text-muted-foreground hover:text-foreground">
                           <Info className="h-5 w-5" />
                         </button>
                       </SheetTrigger>
@@ -374,17 +432,20 @@ export default function SessionPage() {
                           <SheetDescription>Form Cue</SheetDescription>
                         </SheetHeader>
                         <p className="mt-4 text-sm leading-relaxed">{exercise.formCue}</p>
+                        {exercise.notes && (
+                          <p className="mt-2 text-xs text-muted-foreground italic">{exercise.notes}</p>
+                        )}
                       </SheetContent>
                     </Sheet>
                   </div>
 
-                  {/* Sets progress */}
+                  {/* Sets progress dots */}
                   <div className="mt-4 flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground">Sets:</span>
                     {Array.from({ length: totalSets }).map((_, i) => (
                       <div
                         key={i}
-                        className={`h-2.5 w-2.5 rounded-full ${
+                        className={`h-2.5 w-2.5 rounded-full transition-colors ${
                           i < completedSets ? 'bg-primary' : 'bg-muted'
                         }`}
                       />
@@ -397,17 +458,25 @@ export default function SessionPage() {
                   {/* Logged sets table */}
                   {completedSets > 0 && (
                     <div className="mt-3 rounded-lg bg-muted/50 p-2">
-                      <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-muted-foreground mb-1">
-                        <span>Set</span><span>Weight</span><span>Reps</span><span>RPE</span>
+                      <div className={`grid gap-1 text-[10px] font-medium text-muted-foreground mb-1 ${isBodyweight ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                        <span>Set</span>
+                        {!isBodyweight && <span>Weight</span>}
+                        <span>{isTimed ? 'Secs' : 'Reps'}</span>
+                        <span>RPE</span>
                       </div>
-                      {loggedExercise.sets.map((s) => (
-                        <div key={s.setNumber} className="grid grid-cols-4 gap-1 text-xs py-0.5">
-                          <span>{s.setNumber}</span>
-                          <span>{s.weight}kg</span>
-                          <span>{s.reps}</span>
-                          <span>{s.rpe}</span>
-                        </div>
-                      ))}
+                      {loggedExercise.sets.map((s, i) => {
+                        // Beat-last-session indicator
+                        const lastSet = lastLoggedExercise?.sets?.[i];
+                        const beat = lastSet && (s.weight > lastSet.weight || (s.weight === lastSet.weight && s.reps > lastSet.reps));
+                        return (
+                          <div key={s.setNumber} className={`grid gap-1 text-xs py-0.5 ${isBodyweight ? 'grid-cols-3' : 'grid-cols-4'} ${beat ? 'text-primary font-semibold' : ''}`}>
+                            <span>{s.setNumber} {beat && '🟢'}</span>
+                            {!isBodyweight && <span>{s.weight}kg</span>}
+                            <span>{s.reps}</span>
+                            <span>{s.rpe}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -419,40 +488,71 @@ export default function SessionPage() {
                   <CardContent className="p-4">
                     <p className="mb-3 text-xs font-semibold text-muted-foreground">
                       Set {completedSets + 1} of {totalSets}
+                      {isUnilateral && ' (each side)'}
                     </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground">Weight (kg)</label>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={currentWeight}
-                          onChange={(e) => setCurrentWeight(e.target.value)}
-                          className="mt-1 touch-target text-lg font-bold"
-                        />
-                      </div>
+
+                    <div className={`grid gap-3 ${isBodyweight ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      {!isBodyweight && (
+                        <div>
+                          <label className="text-[10px] font-medium text-muted-foreground">Weight (kg)</label>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            placeholder={lastSetWeight ? `Last: ${lastSetWeight}` : '0'}
+                            value={currentWeight}
+                            onChange={(e) => { setCurrentWeight(e.target.value); setValidationError(''); }}
+                            className="mt-1 touch-target text-lg font-bold"
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="text-[10px] font-medium text-muted-foreground">
-                          {exercise.type === 'timed' ? 'Seconds' : 'Reps'}
+                          {isTimed ? 'Duration (seconds)' : 'Reps'}
                         </label>
                         <Input
                           type="number"
-                          placeholder="0"
+                          inputMode="numeric"
+                          placeholder={
+                            isTimed
+                              ? `${exercise.repRangeMin}-${exercise.repRangeMax}s`
+                              : lastSetReps
+                              ? `Last: ${lastSetReps}`
+                              : `${exercise.repRangeMin}-${exercise.repRangeMax}`
+                          }
                           value={currentReps}
-                          onChange={(e) => setCurrentReps(e.target.value)}
+                          onChange={(e) => { setCurrentReps(e.target.value); setValidationError(''); }}
                           className="mt-1 touch-target text-lg font-bold"
                         />
                       </div>
                     </div>
+
                     <div className="mt-3">
-                      <label className="text-[10px] font-medium text-muted-foreground">RPE</label>
-                      <div className="mt-1">
+                      <label className="text-[10px] font-medium text-muted-foreground">RPE (Rate of Perceived Exertion)</label>
+                      <div className="mt-1.5">
                         <RPESelector value={currentRPE} onChange={setCurrentRPE} />
                       </div>
                     </div>
+
+                    {/* Validation Error */}
+                    {validationError && (
+                      <div className="mt-3 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                        <span className="text-xs text-destructive font-medium">{validationError}</span>
+                      </div>
+                    )}
+
+                    {/* Rep range hint */}
+                    {!isTimed && (
+                      <p className="mt-2 text-[10px] text-muted-foreground text-center">
+                        Target: {exercise.repRangeMin}–{exercise.repRangeMax} reps
+                        {isUnilateral && ' per side'}
+                      </p>
+                    )}
+
                     <Button
                       className="mt-4 w-full touch-target text-base font-semibold"
                       size="lg"
+                      type="button"
                       onClick={handleLogSet}
                     >
                       <Check className="mr-2 h-5 w-5" />
@@ -462,7 +562,7 @@ export default function SessionPage() {
                 </Card>
               )}
 
-              {/* All sets done for this exercise */}
+              {/* All sets done */}
               {allSetsComplete && (
                 <Card className="mt-3 border-primary/30 bg-primary/5">
                   <CardContent className="flex items-center justify-center gap-2 p-4">
@@ -484,9 +584,9 @@ export default function SessionPage() {
                       variant="outline"
                       size="sm"
                       className="text-xs"
+                      type="button"
                       onClick={() => {
-                        const today = format(new Date(), 'yyyy-MM-dd');
-                        addHydrationEntry(today, {
+                        addHydrationEntry(format(new Date(), 'yyyy-MM-dd'), {
                           id: `h_${Date.now()}`,
                           amount: 250,
                           timestamp: new Date().toISOString(),
@@ -509,6 +609,7 @@ export default function SessionPage() {
               variant="outline"
               size="sm"
               className="touch-target"
+              type="button"
               disabled={currentExerciseIndex === 0}
               onClick={() => goToExercise(currentExerciseIndex - 1)}
             >
@@ -519,6 +620,7 @@ export default function SessionPage() {
               <Button
                 className="touch-target text-base font-semibold px-6"
                 size="lg"
+                type="button"
                 onClick={handleFinishSession}
               >
                 <Trophy className="mr-2 h-5 w-5" /> Finish
@@ -528,6 +630,7 @@ export default function SessionPage() {
                 variant="outline"
                 size="sm"
                 className="touch-target"
+                type="button"
                 disabled={currentExerciseIndex === day.exercises.length - 1}
                 onClick={() => goToExercise(currentExerciseIndex + 1)}
               >
@@ -557,6 +660,7 @@ export default function SessionPage() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
             className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm"
+            onClick={() => setShowPR(null)}
           >
             <motion.div
               animate={{ rotate: [0, -10, 10, -10, 0] }}
@@ -564,8 +668,9 @@ export default function SessionPage() {
             >
               <Trophy className="h-16 w-16 text-neon-amber" />
             </motion.div>
-            <h2 className="mt-4 font-display text-2xl font-bold text-primary">New PR!</h2>
+            <h2 className="mt-4 font-display text-2xl font-bold text-primary">New PR! 🎉</h2>
             <p className="mt-1 text-sm text-muted-foreground">{showPR}</p>
+            <p className="mt-4 text-xs text-muted-foreground">Tap to dismiss</p>
           </motion.div>
         )}
       </AnimatePresence>
