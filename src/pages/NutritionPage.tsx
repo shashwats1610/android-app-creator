@@ -263,8 +263,9 @@ function MealCard({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const mealMacros = sumFoodMacros(meal.foods);
-  const hasFoods = meal.foods.length > 0;
+  const foods = meal.foods || [];
+  const mealMacros = sumFoodMacros(foods);
+  const hasFoods = foods.length > 0;
 
   return (
     <Card className={`transition-colors ${meal.completed ? 'border-primary/30 bg-primary/5' : ''}`}>
@@ -319,7 +320,7 @@ function MealCard({
             </div>
             {hasFoods && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {meal.foods.length} item{meal.foods.length !== 1 ? 's' : ''} · {mealMacros.calories}kcal · P{mealMacros.protein}g C{mealMacros.carbs}g F{mealMacros.fats}g
+                {foods.length} item{foods.length !== 1 ? 's' : ''} · {mealMacros.calories}kcal · P{mealMacros.protein}g C{mealMacros.carbs}g F{mealMacros.fats}g
               </p>
             )}
             {meal.completed && meal.timestamp && (
@@ -342,12 +343,12 @@ function MealCard({
         <Collapsible>
           <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-border px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors">
             <FileText className="h-3 w-3" />
-            <span>{hasFoods ? `${meal.foods.length} food items` : 'Add foods'}</span>
+            <span>{hasFoods ? `${foods.length} food items` : 'Add foods'}</span>
             <ChevronDown className="ml-auto h-3 w-3" />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="border-t border-border px-3 py-2 space-y-1.5">
-              {meal.foods.map((food) => (
+              {foods.map((food) => (
                 <div key={food.id} className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
@@ -524,7 +525,7 @@ export default function NutritionPage() {
       name: m.name,
       isPreWorkout: m.isPreWorkout,
       isPostWorkout: m.isPostWorkout,
-      defaultFoods: m.foods.length > 0 ? [...m.foods] : undefined,
+      defaultFoods: (m.foods || []).length > 0 ? [...(m.foods || [])] : undefined,
     }));
     saveMealTemplates(templates);
     toast.success('Meal plan saved as template!');
