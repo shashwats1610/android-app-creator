@@ -1,9 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { format } from 'date-fns';
 import {
   Utensils, Droplets, Plus, Check, ChevronLeft, ChevronDown, ChevronUp,
-  Pencil, Trash2, GripVertical, X, Save, RotateCcw, FileText, Zap,
+  Pencil, Trash2, X, Save, Zap, Clock, ArrowRight, FileText,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -61,7 +62,275 @@ function sumAllMealMacros(meals: MealEntry[]): MacroTargets {
   );
 }
 
-// ========== ADD FOOD SHEET ==========
+// ========== QUICK LOG SHEET ==========
+function QuickLogSheet({
+  meal,
+  open,
+  onOpenChange,
+  onComplete,
+  onSkipComplete,
+  onOpenDetailedAdd,
+  recentFoods,
+}: {
+  meal: MealEntry | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onComplete: (meal: MealEntry, addedFoods: FoodItem[]) => void;
+  onSkipComplete: (meal: MealEntry) => void;
+  onOpenDetailedAdd: () => void;
+  recentFoods: FoodItem[];
+}) {
+  const [foodName, setFoodName] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fats, setFats] = useState('');
+  const [calories, setCalories] = useState('');
+  const [calManuallySet, setCalManuallySet] = useState(false);
+  const [addedFoods, setAddedFoods] = useState<FoodItem[]>([]);
+
+  // Reset when sheet opens with a new meal
+  useEffect(() => {
+    if (open) {
+      setFoodName('');
+      setProtein('');
+      setCarbs('');
+      setFats('');
+      setCalories('');
+      setCalManuallySet(false);
+      setAddedFoods([]);
+    }
+  }, [open]);
+
+  // Auto-calc calories
+  const autoCalories = Math.round(
+    (Number(protein) || 0) * 4 + (Number(carbs) || 0) * 4 + (Number(fats) || 0) * 9
+  );
+
+  const effectiveCalories = calManuallySet ? (Number(calories) || 0) : autoCalories;
+
+  if (!meal) return null;
+
+  const handleAddCurrentFood = () => {
+    if (!foodName.trim() && !protein && !carbs && !fats) return;
+    const food: FoodItem = {
+      id: `food_${Date.now()}`,
+      name: foodName.trim() || 'Quick entry',
+      protein: Number(protein) || 0,
+      carbs: Number(carbs) || 0,
+      fats: Number(fats) || 0,
+      calories: effectiveCalories,
+    };
+    setAddedFoods((prev) => [...prev, food]);
+    setFoodName('');
+    setProtein('');
+    setCarbs('');
+    setFats('');
+    setCalories('');
+    setCalManuallySet(false);
+  };
+
+  const handleAddRecentFood = (food: FoodItem) => {
+    const newFood = { ...food, id: `food_${Date.now()}` };
+    setAddedFoods((prev) => [...prev, newFood]);
+  };
+
+  const handleRemoveAdded = (id: string) => {
+    setAddedFoods((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleDone = () => {
+    // If there's unsaved input, add it first
+    let finalFoods = [...addedFoods];
+    if (foodName.trim() || protein || carbs || fats) {
+      finalFoods.push({
+        id: `food_${Date.now()}`,
+        name: foodName.trim() || 'Quick entry',
+        protein: Number(protein) || 0,
+        carbs: Number(carbs) || 0,
+        fats: Number(fats) || 0,
+        calories: effectiveCalories,
+      });
+    }
+    onComplete(meal, finalFoods);
+    onOpenChange(false);
+  };
+
+  const handleSkip = () => {
+    onSkipComplete(meal);
+    onOpenChange(false);
+  };
+
+  const addedMacros = sumFoodMacros(addedFoods);
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+        <SheetHeader className="pb-0">
+          <div className="flex items-center justify-between">
+            <SheetTitle className="text-base">{meal.name}</SheetTitle>
+            <button
+              onClick={handleSkip}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+            >
+              Skip & Complete →
+            </button>
+          </div>
+          <SheetDescription className="text-xs">What did you eat? Log it quick.</SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-3 flex flex-col gap-3">
+          {/* Recent Foods */}
+          {recentFoods.length > 0 && (
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Recent Foods</p>
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-2 pb-2">
+                  {recentFoods.slice(0, 10).map((food) => (
+                    <button
+                      key={food.id}
+                      type="button"
+                      onClick={() => handleAddRecentFood(food)}
+                      className="shrink-0 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors"
+                    >
+                      {food.name}
+                      <span className="ml-1 text-muted-foreground">{food.calories}cal</span>
+                    </button>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Added foods list */}
+          {addedFoods.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">Added</p>
+              {addedFoods.map((food) => (
+                <div key={food.id} className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/10 px-2.5 py-1.5">
+                  <div>
+                    <span className="text-xs font-medium">{food.name}</span>
+                    <span className="ml-2 text-[10px] text-muted-foreground">
+                      P{food.protein} C{food.carbs} F{food.fats} · {food.calories}cal
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => handleRemoveAdded(food.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <div className="text-[10px] text-muted-foreground text-right">
+                Total: P{addedMacros.protein}g C{addedMacros.carbs}g F{addedMacros.fats}g · {addedMacros.calories}cal
+              </div>
+            </div>
+          )}
+
+          {/* Quick macro entry */}
+          <div className="space-y-2">
+            <Input
+              placeholder="Food name (optional)"
+              value={foodName}
+              onChange={(e) => setFoodName(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="grid grid-cols-4 gap-1.5">
+              <div>
+                <label className="text-[10px] font-semibold text-neon">P</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={protein}
+                  onChange={(e) => setProtein(e.target.value)}
+                  className="h-8 text-xs mt-0.5"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-neon-amber">C</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={carbs}
+                  onChange={(e) => setCarbs(e.target.value)}
+                  className="h-8 text-xs mt-0.5"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-neon-red">F</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={fats}
+                  onChange={(e) => setFats(e.target.value)}
+                  className="h-8 text-xs mt-0.5"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-neon-purple">Cal</label>
+                <Input
+                  type="number"
+                  placeholder={autoCalories > 0 ? String(autoCalories) : '0'}
+                  value={calManuallySet ? calories : ''}
+                  onChange={(e) => {
+                    setCalories(e.target.value);
+                    setCalManuallySet(true);
+                  }}
+                  onFocus={() => {
+                    if (!calManuallySet && autoCalories > 0) {
+                      setCalories(String(autoCalories));
+                      setCalManuallySet(true);
+                    }
+                  }}
+                  className="h-8 text-xs mt-0.5"
+                />
+              </div>
+            </div>
+            {autoCalories > 0 && !calManuallySet && (
+              <p className="text-[10px] text-muted-foreground text-center">
+                Auto: P×4 + C×4 + F×9 = {autoCalories} cal
+              </p>
+            )}
+          </div>
+
+          {/* Add another food button */}
+          {(foodName.trim() || protein || carbs || fats) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleAddCurrentFood}
+            >
+              <Plus className="mr-1 h-3 w-3" /> Add & enter another
+            </Button>
+          )}
+
+          {/* Detailed add link */}
+          <button
+            type="button"
+            onClick={() => {
+              onOpenChange(false);
+              setTimeout(onOpenDetailedAdd, 300);
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-1"
+          >
+            <FileText className="inline h-3 w-3 mr-1" />
+            Add detailed food item instead
+          </button>
+
+          {/* Done button */}
+          <Button
+            className="touch-target text-base font-semibold w-full"
+            size="lg"
+            onClick={handleDone}
+          >
+            <Check className="mr-2 h-4 w-4" /> Done — Log Meal
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ========== ADD FOOD SHEET (detailed) ==========
 function AddFoodSheet({
   open,
   onOpenChange,
@@ -168,15 +437,14 @@ function EditMealSheet({
   const [isPostWorkout, setIsPostWorkout] = useState(meal?.isPostWorkout ?? false);
   const [notes, setNotes] = useState(meal?.notes ?? '');
 
-  // Reset when meal changes
-  useState(() => {
+  useEffect(() => {
     if (meal) {
       setName(meal.name);
       setIsPreWorkout(meal.isPreWorkout ?? false);
       setIsPostWorkout(meal.isPostWorkout ?? false);
       setNotes(meal.notes ?? '');
     }
-  });
+  }, [meal]);
 
   if (!meal) return null;
 
@@ -242,66 +510,73 @@ function EditMealSheet({
 // ========== MEAL CARD ==========
 function MealCard({
   meal,
-  onToggle,
+  isNextUp,
+  onTapCheck,
   onEdit,
   onDelete,
   onMoveUp,
   onMoveDown,
-  onAddFood,
-  onRemoveFood,
   isFirst,
   isLast,
 }: {
   meal: MealEntry;
-  onToggle: () => void;
+  isNextUp: boolean;
+  onTapCheck: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onAddFood: () => void;
-  onRemoveFood: (foodId: string) => void;
   isFirst: boolean;
   isLast: boolean;
 }) {
   const foods = meal.foods || [];
   const mealMacros = sumFoodMacros(foods);
   const hasFoods = foods.length > 0;
+  const hasAnyMacros = mealMacros.calories > 0;
 
   return (
-    <Card className={`transition-colors ${meal.completed ? 'border-primary/30 bg-primary/5' : ''}`}>
-      <CardContent className="p-0">
+    <Card
+      className={`transition-all duration-200 ${
+        meal.completed
+          ? 'border-primary/20 bg-primary/5 opacity-80'
+          : isNextUp
+          ? 'border-primary/40 ring-1 ring-primary/20 shadow-sm'
+          : ''
+      }`}
+    >
+      <CardContent className={`p-0 ${meal.completed ? 'py-0' : ''}`}>
+        {/* Next up badge */}
+        {isNextUp && !meal.completed && (
+          <div className="flex items-center gap-1 px-3 pt-2 pb-0">
+            <ArrowRight className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Next up</span>
+          </div>
+        )}
+
         {/* Main row */}
-        <div className="flex items-center gap-2 p-3">
+        <div className={`flex items-center gap-2 ${meal.completed ? 'p-2.5' : 'p-3'}`}>
           {/* Reorder */}
           <div className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              onClick={onMoveUp}
-              disabled={isFirst}
-              className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 touch-target"
-              aria-label="Move up"
-            >
+            <button type="button" onClick={onMoveUp} disabled={isFirst} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20" aria-label="Move up">
               <ChevronUp className="h-3 w-3" />
             </button>
-            <button
-              type="button"
-              onClick={onMoveDown}
-              disabled={isLast}
-              className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 touch-target"
-              aria-label="Move down"
-            >
+            <button type="button" onClick={onMoveDown} disabled={isLast} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20" aria-label="Move down">
               <ChevronDown className="h-3 w-3" />
             </button>
           </div>
 
-          {/* Check circle */}
-          <button type="button" onClick={onToggle} className="touch-target shrink-0">
+          {/* Check circle — opens QuickLogSheet */}
+          <button type="button" onClick={onTapCheck} className="touch-target shrink-0">
             <div
-              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${
-                meal.completed ? 'border-primary bg-primary' : 'border-muted-foreground/30'
+              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
+                meal.completed
+                  ? 'border-primary bg-primary scale-100'
+                  : isNextUp
+                  ? 'border-primary/60 scale-110'
+                  : 'border-muted-foreground/30'
               }`}
             >
-              {meal.completed && <Check className="h-3 w-3 text-primary-foreground" />}
+              {meal.completed && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
             </div>
           </button>
 
@@ -311,82 +586,65 @@ function MealCard({
               <span className={`text-sm font-medium truncate ${meal.completed ? 'line-through text-muted-foreground' : ''}`}>
                 {meal.name}
               </span>
-              {meal.isPreWorkout && (
-                <Badge variant="secondary" className="text-[9px] shrink-0">Pre</Badge>
-              )}
-              {meal.isPostWorkout && (
-                <Badge variant="secondary" className="text-[9px] shrink-0">Post</Badge>
-              )}
+              {meal.isPreWorkout && <Badge variant="secondary" className="text-[9px] shrink-0">Pre</Badge>}
+              {meal.isPostWorkout && <Badge variant="secondary" className="text-[9px] shrink-0">Post</Badge>}
             </div>
-            {hasFoods && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {foods.length} item{foods.length !== 1 ? 's' : ''} · {mealMacros.calories}kcal · P{mealMacros.protein}g C{mealMacros.carbs}g F{mealMacros.fats}g
-              </p>
+
+            {/* Always-visible macro summary */}
+            {hasAnyMacros && (
+              <div className={`flex items-center gap-2 mt-0.5 text-[10px] ${meal.completed ? 'text-muted-foreground' : ''}`}>
+                <span className="text-neon font-medium">P{mealMacros.protein}</span>
+                <span className="text-neon-amber font-medium">C{mealMacros.carbs}</span>
+                <span className="text-neon-red font-medium">F{mealMacros.fats}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-neon-purple font-medium">{mealMacros.calories}cal</span>
+              </div>
             )}
+
             {meal.completed && meal.timestamp && (
-              <p className="text-[10px] text-muted-foreground">{format(new Date(meal.timestamp), 'HH:mm')}</p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <Clock className="h-2.5 w-2.5 text-muted-foreground" />
+                <p className="text-[10px] text-muted-foreground">{format(new Date(meal.timestamp), 'h:mm a')}</p>
+              </div>
             )}
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-1">
-            <button type="button" onClick={onEdit} className="touch-target p-1 text-muted-foreground hover:text-foreground" aria-label="Edit meal">
+            <button type="button" onClick={onEdit} className="p-1.5 text-muted-foreground hover:text-foreground" aria-label="Edit meal">
               <Pencil className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={onDelete} className="touch-target p-1 text-muted-foreground hover:text-destructive" aria-label="Delete meal">
+            <button type="button" onClick={onDelete} className="p-1.5 text-muted-foreground hover:text-destructive" aria-label="Delete meal">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Foods collapsible */}
-        <Collapsible>
-          <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-border px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors">
-            <FileText className="h-3 w-3" />
-            <span>{hasFoods ? `${foods.length} food items` : 'Add foods'}</span>
-            <ChevronDown className="ml-auto h-3 w-3" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="border-t border-border px-3 py-2 space-y-1.5">
-              {foods.map((food) => (
-                <div key={food.id} className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium truncate">{food.name}</span>
-                      {food.quantity && (
-                        <span className="text-[10px] text-muted-foreground shrink-0">{food.quantity}</span>
-                      )}
+        {/* Expanded foods for non-completed meals */}
+        {!meal.completed && hasFoods && (
+          <Collapsible>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-border px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors">
+              <FileText className="h-3 w-3" />
+              <span>{foods.length} food item{foods.length !== 1 ? 's' : ''} logged</span>
+              <ChevronDown className="ml-auto h-3 w-3" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t border-border px-3 py-2 space-y-1">
+                {foods.map((food) => (
+                  <div key={food.id} className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1">
+                    <div>
+                      <span className="text-xs font-medium">{food.name}</span>
+                      {food.quantity && <span className="ml-1 text-[10px] text-muted-foreground">{food.quantity}</span>}
+                      <p className="text-[10px] text-muted-foreground">
+                        P{food.protein} C{food.carbs} F{food.fats} · {food.calories}cal
+                      </p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      {food.calories}kcal · P{food.protein}g C{food.carbs}g F{food.fats}g
-                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveFood(food.id)}
-                    className="touch-target p-1 text-muted-foreground hover:text-destructive shrink-0"
-                    aria-label="Remove food"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-xs touch-target"
-                onClick={onAddFood}
-              >
-                <Plus className="mr-1 h-3 w-3" /> Add Food
-              </Button>
-              {meal.notes && (
-                <p className="text-[10px] text-muted-foreground italic pt-1 border-t border-border">
-                  {meal.notes}
-                </p>
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </CardContent>
     </Card>
   );
@@ -397,11 +655,10 @@ export default function NutritionPage() {
   const navigate = useNavigate();
   const {
     settings, dailyNutrition, updateDailyNutrition, dailyHydration,
-    addHydrationEntry, mealTemplates, saveMealTemplates,
+    addHydrationEntry, mealTemplates, saveMealTemplates, recentFoods, addRecentFood,
   } = useAppStore();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Initialize from templates if no data for today
   const createMealsFromTemplates = useCallback((): MealEntry[] => {
     return (mealTemplates ?? []).map((t, i) => ({
       id: `meal_${Date.now()}_${i}`,
@@ -423,47 +680,69 @@ export default function NutritionPage() {
   const [meals, setMeals] = useState<MealEntry[]>(nutrition.meals);
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null);
   const [addFoodForMealId, setAddFoodForMealId] = useState<string | null>(null);
-  const [manualMacros, setManualMacros] = useState<MacroTargets>({ protein: 0, carbs: 0, fats: 0, calories: 0 });
+  const [quickLogMeal, setQuickLogMeal] = useState<MealEntry | null>(null);
 
-  // Auto-calculated macros from food items
-  const foodMacros = useMemo(() => sumAllMealMacros(meals), [meals]);
-  const totalConsumed: MacroTargets = {
-    protein: foodMacros.protein + manualMacros.protein,
-    carbs: foodMacros.carbs + manualMacros.carbs,
-    fats: foodMacros.fats + manualMacros.fats,
-    calories: foodMacros.calories + manualMacros.calories,
-  };
+  const totalConsumed = useMemo(() => sumAllMealMacros(meals), [meals]);
+
+  // Find next uncompleted meal
+  const nextUpIdx = useMemo(() => meals.findIndex((m) => !m.completed), [meals]);
 
   const save = useCallback((newMeals: MealEntry[]) => {
     const macros = sumAllMealMacros(newMeals);
-    const total: MacroTargets = {
-      protein: macros.protein + manualMacros.protein,
-      carbs: macros.carbs + manualMacros.carbs,
-      fats: macros.fats + manualMacros.fats,
-      calories: macros.calories + manualMacros.calories,
-    };
-    updateDailyNutrition(today, { date: today, consumed: total, meals: newMeals });
-  }, [today, manualMacros, updateDailyNutrition]);
+    updateDailyNutrition(today, { date: today, consumed: macros, meals: newMeals });
+  }, [today, updateDailyNutrition]);
 
-  const updateManualMacro = (key: keyof MacroTargets, value: number) => {
-    const next = { ...manualMacros, [key]: value };
-    setManualMacros(next);
-    const macros = sumAllMealMacros(meals);
-    const total: MacroTargets = {
-      protein: macros.protein + next.protein,
-      carbs: macros.carbs + next.carbs,
-      fats: macros.fats + next.fats,
-      calories: macros.calories + next.calories,
-    };
-    updateDailyNutrition(today, { date: today, consumed: total, meals });
+  const handleTapCheck = (meal: MealEntry) => {
+    if (meal.completed) {
+      // Uncomplete it
+      const next = meals.map((m) =>
+        m.id === meal.id ? { ...m, completed: false, timestamp: undefined } : m
+      );
+      setMeals(next);
+      save(next);
+    } else {
+      // Open QuickLogSheet
+      setQuickLogMeal(meal);
+    }
   };
 
-  const toggleMeal = (id: string) => {
+  const handleQuickLogComplete = (meal: MealEntry, addedFoods: FoodItem[]) => {
     const next = meals.map((m) =>
-      m.id === id ? { ...m, completed: !m.completed, timestamp: !m.completed ? new Date().toISOString() : undefined } : m
+      m.id === meal.id
+        ? {
+            ...m,
+            completed: true,
+            timestamp: new Date().toISOString(),
+            foods: [...(m.foods || []), ...addedFoods],
+          }
+        : m
     );
     setMeals(next);
     save(next);
+
+    // Save foods to recent
+    addedFoods.forEach((f) => {
+      if (f.name !== 'Quick entry') addRecentFood(f);
+    });
+
+    const totalCal = addedFoods.reduce((sum, f) => sum + f.calories, 0);
+    toast.success(
+      addedFoods.length > 0
+        ? `${meal.name} logged — ${totalCal} cal`
+        : `${meal.name} checked off ✓`,
+      { duration: 2000 }
+    );
+  };
+
+  const handleSkipComplete = (meal: MealEntry) => {
+    const next = meals.map((m) =>
+      m.id === meal.id
+        ? { ...m, completed: true, timestamp: new Date().toISOString() }
+        : m
+    );
+    setMeals(next);
+    save(next);
+    toast.success(`${meal.name} checked off ✓`, { duration: 1500 });
   };
 
   const deleteMeal = (id: string) => {
@@ -504,19 +783,12 @@ export default function NutritionPage() {
 
   const addFoodToMeal = (mealId: string, food: FoodItem) => {
     const next = meals.map((m) =>
-      m.id === mealId ? { ...m, foods: [...m.foods, food] } : m
+      m.id === mealId ? { ...m, foods: [...(m.foods || []), food] } : m
     );
     setMeals(next);
     save(next);
+    addRecentFood(food);
     toast.success(`${food.name} added`);
-  };
-
-  const removeFoodFromMeal = (mealId: string, foodId: string) => {
-    const next = meals.map((m) =>
-      m.id === mealId ? { ...m, foods: m.foods.filter((f) => f.id !== foodId) } : m
-    );
-    setMeals(next);
-    save(next);
   };
 
   const saveAsTemplate = () => {
@@ -574,7 +846,7 @@ export default function NutritionPage() {
                 <Utensils className="h-4 w-4 text-neon-amber" />
                 <span className="text-sm font-semibold">Daily Macros</span>
                 <span className="ml-auto text-[10px] text-muted-foreground">
-                  From food items + manual
+                  {completedMeals}/{meals.length} meals
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -596,36 +868,6 @@ export default function NutritionPage() {
                   );
                 })}
               </div>
-
-              {/* Manual macro adjustments */}
-              <Collapsible className="mt-3">
-                <CollapsibleTrigger className="flex w-full items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                  <Plus className="h-3 w-3" />
-                  <span>Quick add macros manually</span>
-                  <ChevronDown className="ml-auto h-3 w-3" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {(Object.keys(settings.macroTargets) as (keyof MacroTargets)[]).map((key) => {
-                      const unit = key === 'calories' ? 'kcal' : 'g';
-                      return (
-                        <div key={key}>
-                          <label className={`text-[10px] font-medium capitalize ${macroColors[key]}`}>
-                            + {key} ({unit})
-                          </label>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            className="h-8 text-xs touch-target mt-0.5"
-                            value={manualMacros[key] || ''}
-                            onChange={(e) => updateManualMacro(key, Number(e.target.value) || 0)}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
             </CardContent>
           </Card>
         </motion.div>
@@ -656,13 +898,12 @@ export default function NutritionPage() {
                     >
                       <MealCard
                         meal={meal}
-                        onToggle={() => toggleMeal(meal.id)}
+                        isNextUp={idx === nextUpIdx}
+                        onTapCheck={() => handleTapCheck(meal)}
                         onEdit={() => setEditingMeal(meal)}
                         onDelete={() => deleteMeal(meal.id)}
                         onMoveUp={() => moveMeal(idx, -1)}
                         onMoveDown={() => moveMeal(idx, 1)}
-                        onAddFood={() => setAddFoodForMealId(meal.id)}
-                        onRemoveFood={(foodId) => removeFoodFromMeal(meal.id, foodId)}
                         isFirst={idx === 0}
                         isLast={idx === meals.length - 1}
                       />
@@ -715,6 +956,19 @@ export default function NutritionPage() {
         </motion.div>
       </motion.div>
 
+      {/* Quick Log Sheet */}
+      <QuickLogSheet
+        meal={quickLogMeal}
+        open={!!quickLogMeal}
+        onOpenChange={(open) => { if (!open) setQuickLogMeal(null); }}
+        onComplete={handleQuickLogComplete}
+        onSkipComplete={handleSkipComplete}
+        onOpenDetailedAdd={() => {
+          if (quickLogMeal) setAddFoodForMealId(quickLogMeal.id);
+        }}
+        recentFoods={recentFoods || []}
+      />
+
       {/* Edit Meal Sheet */}
       <EditMealSheet
         meal={editingMeal}
@@ -723,7 +977,7 @@ export default function NutritionPage() {
         onSave={updateMeal}
       />
 
-      {/* Add Food Sheet */}
+      {/* Add Food Sheet (detailed) */}
       <AddFoodSheet
         open={!!addFoodForMealId}
         onOpenChange={(open) => { if (!open) setAddFoodForMealId(null); }}
