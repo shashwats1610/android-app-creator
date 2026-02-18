@@ -15,6 +15,11 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { EstimatedMaxes, MacroTargets } from '@/types/workout';
+import {
+  sampleSessions, samplePersonalRecords, sampleBodyMeasurements,
+  sampleRecentFoods, sampleDailyNutrition, sampleDailyHydration,
+  sampleEstimatedMaxes, sampleMacroTargets,
+} from '@/data/sampleData';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
@@ -258,7 +263,24 @@ export default function SettingsPage() {
                 variant="outline"
                 className="w-full touch-target text-xs"
                 onClick={() => {
-                  loadSampleData();
+                  loadSampleData({
+                    settings: {
+                      onboardingComplete: true,
+                      estimatedMaxes: sampleEstimatedMaxes,
+                      macroTargets: sampleMacroTargets,
+                      hydrationGoal: 3000,
+                      theme: 'dark',
+                      currentDayIndex: 0,
+                      restTimerOverrides: {},
+                    },
+                    sessions: sampleSessions,
+                    personalRecords: samplePersonalRecords,
+                    bodyMeasurements: sampleBodyMeasurements,
+                    dailyNutrition: sampleDailyNutrition,
+                    dailyHydration: sampleDailyHydration,
+                    recentFoods: sampleRecentFoods,
+                    streak: 3,
+                  });
                   toast.success('Sample data loaded! Check all pages to see the data.', { duration: 3000 });
                 }}
               >
