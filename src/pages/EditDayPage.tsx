@@ -79,7 +79,7 @@ export default function EditDayPage() {
     <>
       <motion.div className="flex flex-col gap-4 p-4 pt-6" variants={container} initial="hidden" animate="show">
         <motion.div variants={item} className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="touch-target flex items-center justify-center">
+          <button onClick={() => navigate('/workout/edit')} className="touch-target flex items-center justify-center">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex-1">
