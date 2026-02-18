@@ -1,13 +1,14 @@
 import { useAppStore } from '@/stores/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Droplets, Dumbbell, Plus, TrendingUp, Utensils, Scale, ChevronRight } from 'lucide-react';
+import { Droplets, Dumbbell, Plus, TrendingUp, Utensils, Scale, ChevronRight, Moon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { motion } from 'framer-motion';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { useMemo } from 'react';
+import WeeklyVolumeChart from '@/components/WeeklyVolumeChart';
 
 const container = {
   hidden: { opacity: 0 },
@@ -95,6 +96,24 @@ export default function HomePage() {
     ? Math.floor((Date.now() - new Date(lastSession.date).getTime()) / 86400000)
     : null;
 
+  // Consecutive training days (for rest day awareness)
+  const consecutiveTrainingDays = useMemo(() => {
+    let count = 0;
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = format(new Date(now.getTime() - i * 86400000), 'yyyy-MM-dd');
+      if (sessions.some(s => s.date === d)) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [sessions]);
+
+  // Deload suggestion (every ~16 sessions)
+  const shouldSuggestDeload = sessions.length > 0 && sessions.length % 16 < 4 && sessions.length >= 16;
+
   return (
     <motion.div
       className="flex flex-col gap-4 p-4 pt-6"
@@ -129,6 +148,40 @@ export default function HomePage() {
               Last workout was <span className="font-semibold text-foreground">{daysSinceLast} days ago</span> — time to train! 💪
             </p>
           </div>
+        </motion.div>
+      )}
+
+      {/* Rest Day Awareness */}
+      {consecutiveTrainingDays >= 3 && (
+        <motion.div variants={item}>
+          <Card className="border-neon-blue/30 bg-neon-blue/5">
+            <CardContent className="flex items-center gap-3 p-4">
+              <Moon className="h-5 w-5 text-neon-blue shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">Recovery day?</p>
+                <p className="text-xs text-muted-foreground">
+                  You've trained {consecutiveTrainingDays} days in a row — consider a rest day for optimal recovery 🧘
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Deload Suggestion */}
+      {shouldSuggestDeload && (
+        <motion.div variants={item}>
+          <Card className="border-neon-purple/30 bg-neon-purple/5">
+            <CardContent className="flex items-center gap-3 p-4">
+              <TrendingUp className="h-5 w-5 text-neon-purple shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">Deload week?</p>
+                <p className="text-xs text-muted-foreground">
+                  You've logged {sessions.length} sessions — consider reducing intensity by 40% this week for recovery
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       )}
 
@@ -195,6 +248,11 @@ export default function HomePage() {
             <span className="text-[11px] text-muted-foreground">PRs</span>
           </CardContent>
         </Card>
+      </motion.div>
+
+      {/* Weekly Volume Chart */}
+      <motion.div variants={item}>
+        <WeeklyVolumeChart />
       </motion.div>
 
       {/* Hydration Widget */}

@@ -6,16 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger,
 } from '@/components/ui/sheet';
 import {
   ChevronLeft, ChevronRight, Check, Timer, Info, Droplets, Plus, Minus,
-  SkipForward, X, Trophy, AlertCircle,
+  SkipForward, X, Trophy, AlertCircle, MessageSquare, Calculator,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { CircularProgress } from '@/components/CircularProgress';
+import { getExerciseRecommendation, getRecommendationLabel } from '@/lib/progressiveOverload';
+import { PlateCalculator } from '@/components/PlateCalculator';
 import type { LoggedSet, WorkoutSession, InProgressSession } from '@/types/workout';
 
 // ========== REST TIMER ==========
@@ -39,7 +43,6 @@ function RestTimer({
 
   useEffect(() => {
     if (remaining <= 0) {
-      // Vibrate on timer complete
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       onDone();
     }
@@ -174,11 +177,23 @@ export default function SessionPage() {
   const [showRest, setShowRest] = useState(false);
   const [restSeconds, setRestSeconds] = useState(90);
   const [showPR, setShowPR] = useState<string | null>(null);
-  const [currentWeight, setCurrentWeight] = useState('');
+  const [currentWeight, setCurrentWeight] = useState(() => {
+    const state = useAppStore.getState();
+    if (!state.inProgressSession) return '';
+    const { session } = state.inProgressSession;
+    const dayData = state.workoutPlan.days.find(d => d.id === session.dayId);
+    const ex = dayData?.exercises[state.inProgressSession.currentExerciseIndex];
+    if (!ex || ex.type === 'bodyweight') return '';
+    const lastSess = state.sessions.find(s => s.dayId === session.dayId);
+    const lastEx = lastSess?.exercises.find(e => e.exerciseId === ex.id);
+    return lastEx?.sets?.[0]?.weight ? String(lastEx.sets[0].weight) : '';
+  });
   const [currentReps, setCurrentReps] = useState('');
   const [currentRPE, setCurrentRPE] = useState<number>(8);
   const [validationError, setValidationError] = useState('');
   const [justLoggedSet, setJustLoggedSet] = useState(false);
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [showPlateCalc, setShowPlateCalc] = useState(false);
 
   // Redirect if no session
   if (!inProgressSession) {
@@ -214,6 +229,17 @@ export default function SessionPage() {
   const isUnilateral = exercise.type === 'unilateral';
 
   const showHydrationReminder = overallProgress > 0 && overallProgress % 4 === 0 && !allSetsComplete;
+
+  // Progressive overload recommendation
+  const recommendation = getExerciseRecommendation(exercise, useAppStore.getState().sessions);
+  const recLabel = recommendation ? getRecommendationLabel(recommendation.recommendation) : null;
+
+  // Last session data (per-set matching)
+  const lastSessionForDay = useAppStore.getState().sessions.find((s) => s.dayId === session.dayId);
+  const lastLoggedExercise = lastSessionForDay?.exercises.find((e) => e.exerciseId === exercise.id);
+  const lastSetForCurrentSet = lastLoggedExercise?.sets?.[completedSets] ?? lastLoggedExercise?.sets?.[lastLoggedExercise.sets.length - 1];
+  const lastSetWeight = lastSetForCurrentSet?.weight;
+  const lastSetReps = lastSetForCurrentSet?.reps;
 
   const handleLogSet = () => {
     setValidationError('');
@@ -308,11 +334,16 @@ export default function SessionPage() {
     setCurrentReps('');
     setValidationError('');
 
-    // Animate set completion
+    // Auto-fill weight for next set from last session
+    const nextSetIdx = latestCompletedSets + 1;
+    const nextLastSet = lastLoggedExercise?.sets?.[nextSetIdx] ?? lastLoggedExercise?.sets?.[lastLoggedExercise.sets.length - 1];
+    if (nextLastSet && !isBodyweight) {
+      setCurrentWeight(String(nextLastSet.weight));
+    }
+
     setJustLoggedSet(true);
     setTimeout(() => setJustLoggedSet(false), 400);
 
-    // Vibrate on set log
     if (navigator.vibrate) navigator.vibrate(50);
 
     if (latestCompletedSets + 1 < totalSets) {
@@ -330,7 +361,12 @@ export default function SessionPage() {
       ...latest,
       currentExerciseIndex: idx,
     });
-    setCurrentWeight('');
+    // Auto-fill weight from last session
+    const nextExercise = day.exercises[idx];
+    const lastSess = useAppStore.getState().sessions.find(s => s.dayId === session.dayId);
+    const lastEx = lastSess?.exercises.find(e => e.exerciseId === nextExercise.id);
+    const lastW = lastEx?.sets?.[0]?.weight;
+    setCurrentWeight(nextExercise.type !== 'bodyweight' && lastW ? String(lastW) : '');
     setCurrentReps('');
     setCurrentRPE(8);
     setValidationError('');
@@ -343,6 +379,7 @@ export default function SessionPage() {
       ...latest.session,
       endTime: new Date().toISOString(),
       completed: true,
+      notes: sessionNotes || undefined,
     };
     completeSession(finalSession);
     advanceDay();
@@ -355,11 +392,6 @@ export default function SessionPage() {
       navigate('/workout');
     }
   };
-
-  const lastSessionForDay = useAppStore.getState().sessions.find((s) => s.dayId === session.dayId);
-  const lastLoggedExercise = lastSessionForDay?.exercises.find((e) => e.exerciseId === exercise.id);
-  const lastSetWeight = lastLoggedExercise?.sets?.[lastLoggedExercise.sets.length - 1]?.weight;
-  const lastSetReps = lastLoggedExercise?.sets?.[lastLoggedExercise.sets.length - 1]?.reps;
 
   return (
     <>
@@ -454,6 +486,19 @@ export default function SessionPage() {
                           Last session: {lastSetWeight}kg × {lastSetReps} reps
                         </p>
                       )}
+                      {/* Progressive Overload Recommendation */}
+                      {recLabel && recommendation && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className={`text-xs font-semibold ${recLabel.color}`}>
+                            {recLabel.icon} {recLabel.label}
+                          </span>
+                          {recommendation.recommendation === 'add_weight' && (
+                            <span className="text-[11px] text-muted-foreground">
+                              Suggested: {recommendation.suggestedWeight}kg
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <Sheet>
                       <SheetTrigger asChild>
@@ -535,14 +580,26 @@ export default function SessionPage() {
                       {!isBodyweight && (
                         <div>
                           <label className="text-[11px] font-medium text-muted-foreground">Weight (kg)</label>
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            placeholder={lastSetWeight ? `Last: ${lastSetWeight}` : '0'}
-                            value={currentWeight}
-                            onChange={(e) => { setCurrentWeight(e.target.value); setValidationError(''); }}
-                            className="mt-1 touch-target text-lg font-bold"
-                          />
+                          <div className="mt-1 flex gap-1">
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              placeholder={lastSetWeight ? `Last: ${lastSetWeight}` : '0'}
+                              value={currentWeight}
+                              onChange={(e) => { setCurrentWeight(e.target.value); setValidationError(''); }}
+                              className="touch-target text-lg font-bold flex-1"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="touch-target shrink-0"
+                              type="button"
+                              onClick={() => setShowPlateCalc(true)}
+                              aria-label="Plate calculator"
+                            >
+                              <Calculator className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                       <div>
@@ -642,6 +699,23 @@ export default function SessionPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Session Notes */}
+              <Collapsible className="mt-3">
+                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:bg-muted/70 transition-colors">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Session Notes
+                  {sessionNotes && <span className="ml-auto text-[10px] text-primary">●</span>}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <Textarea
+                    placeholder="How's the session going? Any notes for next time..."
+                    value={sessionNotes}
+                    onChange={(e) => setSessionNotes(e.target.value)}
+                    className="min-h-[60px] text-xs"
+                  />
+                </CollapsibleContent>
+              </Collapsible>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -686,6 +760,13 @@ export default function SessionPage() {
           </div>
         </div>
       </div>
+
+      {/* Plate Calculator */}
+      <PlateCalculator
+        weight={parseFloat(currentWeight) || 0}
+        open={showPlateCalc}
+        onOpenChange={setShowPlateCalc}
+      />
 
       {/* Rest Timer Overlay */}
       <AnimatePresence>

@@ -59,6 +59,7 @@ export interface LoggedExercise {
   exerciseName: string;
   sets: LoggedSet[];
   personalRecord: boolean;
+  notes?: string;
 }
 
 export interface WorkoutSession {
