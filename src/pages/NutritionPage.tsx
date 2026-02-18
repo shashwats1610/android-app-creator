@@ -97,7 +97,7 @@ export default function NutritionPage() {
     >
       {/* Header */}
       <motion.div variants={item} className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="touch-target" onClick={() => navigate(-1)}>
+      <Button variant="ghost" size="icon" className="touch-target" onClick={() => navigate('/')}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
