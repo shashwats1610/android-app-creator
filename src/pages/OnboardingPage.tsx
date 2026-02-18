@@ -22,6 +22,12 @@ const maxFields: { key: keyof EstimatedMaxes; label: string }[] = [
   { key: 'weightedDip', label: 'Weighted Dip' },
 ];
 
+const macroPresets: { label: string; macros: MacroTargets; hydration: number }[] = [
+  { label: '🔥 Bulking', macros: { protein: 220, carbs: 400, fats: 90, calories: 3300 }, hydration: 3500 },
+  { label: '⚖️ Maintenance', macros: { protein: 200, carbs: 300, fats: 80, calories: 2800 }, hydration: 3000 },
+  { label: '✂️ Cutting', macros: { protein: 220, carbs: 200, fats: 65, calories: 2200 }, hydration: 3500 },
+];
+
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { updateEstimatedMaxes, updateMacroTargets, updateSettings, completeOnboarding } = useAppStore();
@@ -30,15 +36,27 @@ export default function OnboardingPage() {
   const [maxes, setMaxes] = useState<Record<string, number>>({});
   const [macros, setMacros] = useState<MacroTargets>({ protein: 200, carbs: 300, fats: 80, calories: 2800 });
   const [hydrationGoal, setHydrationGoal] = useState(3000);
+  const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
 
   const stepIdx = steps.indexOf(step);
+
+  const skipAll = () => {
+    completeOnboarding();
+    navigate('/', { replace: true });
+  };
 
   const next = () => {
     if (stepIdx < steps.length - 1) {
       setStep(steps[stepIdx + 1]);
     } else {
-      // Save and finish
-      updateEstimatedMaxes(maxes as any);
+      // Convert lbs to kg before saving
+      const finalMaxes = { ...maxes };
+      if (unit === 'lbs') {
+        for (const key of Object.keys(finalMaxes)) {
+          finalMaxes[key] = Math.round(finalMaxes[key] * 0.4536);
+        }
+      }
+      updateEstimatedMaxes(finalMaxes as any);
       updateMacroTargets(macros);
       updateSettings({ hydrationGoal });
       completeOnboarding();
@@ -48,6 +66,11 @@ export default function OnboardingPage() {
 
   const back = () => {
     if (stepIdx > 0) setStep(steps[stepIdx - 1]);
+  };
+
+  const applyPreset = (preset: typeof macroPresets[0]) => {
+    setMacros(preset.macros);
+    setHydrationGoal(preset.hydration);
   };
 
   return (
@@ -75,9 +98,13 @@ export default function OnboardingPage() {
         >
           {step === 'welcome' && (
             <div className="flex flex-col items-center text-center">
-              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/15">
+              <motion.div
+                className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5"
+                animate={{ boxShadow: ['0 0 20px hsl(var(--primary) / 0.2)', '0 0 40px hsl(var(--primary) / 0.4)', '0 0 20px hsl(var(--primary) / 0.2)'] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
                 <Dumbbell className="h-10 w-10 text-primary" />
-              </div>
+              </motion.div>
               <h1 className="font-display text-3xl font-bold tracking-tight">
                 Hyper<span className="text-primary">trophy</span>
               </h1>
@@ -89,12 +116,28 @@ export default function OnboardingPage() {
 
           {step === 'maxes' && (
             <div>
-              <div className="mb-4 flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                <h2 className="font-display text-xl font-bold">Estimated 1RM</h2>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  <h2 className="font-display text-xl font-bold">Estimated 1RM</h2>
+                </div>
+                {/* Unit toggle */}
+                <div className="flex rounded-lg bg-muted p-0.5">
+                  {(['kg', 'lbs'] as const).map((u) => (
+                    <button
+                      key={u}
+                      onClick={() => setUnit(u)}
+                      className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                        unit === u ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
               </div>
               <p className="mb-4 text-sm text-muted-foreground">
-                Enter your estimated one-rep max (kg) for compound lifts. Used for progressive overload suggestions. You can edit these later.
+                Enter your estimated one-rep max ({unit}) for compound lifts. You can edit these later.
               </p>
               <div className="grid gap-3">
                 {maxFields.map(({ key, label }) => (
@@ -102,7 +145,8 @@ export default function OnboardingPage() {
                     <label className="w-36 text-sm">{label}</label>
                     <Input
                       type="number"
-                      placeholder="kg"
+                      inputMode="decimal"
+                      placeholder={unit}
                       className="touch-target"
                       value={maxes[key] || ''}
                       onChange={(e) =>
@@ -121,9 +165,24 @@ export default function OnboardingPage() {
                 <Droplets className="h-5 w-5 text-neon-blue" />
                 <h2 className="font-display text-xl font-bold">Nutrition & Hydration</h2>
               </div>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Set your daily macro targets and hydration goal. Editable anytime in Settings.
+              <p className="mb-3 text-sm text-muted-foreground">
+                Pick a preset or customize your daily targets.
               </p>
+
+              {/* Macro presets */}
+              <div className="mb-4 flex gap-2">
+                {macroPresets.map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => applyPreset(preset)}
+                    className="flex-1 rounded-lg border border-border bg-card p-2 text-center transition-all hover:border-primary/50 active:scale-95"
+                  >
+                    <span className="text-xs font-semibold">{preset.label}</span>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{preset.macros.calories} kcal</p>
+                  </button>
+                ))}
+              </div>
+
               <Card>
                 <CardContent className="grid gap-3 p-4">
                   {[
@@ -136,6 +195,7 @@ export default function OnboardingPage() {
                       <label className={`w-28 text-sm font-medium ${color}`}>{label}</label>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         className="touch-target"
                         value={macros[key]}
                         onChange={(e) =>
@@ -148,6 +208,7 @@ export default function OnboardingPage() {
                     <label className="w-28 text-sm font-medium text-neon-blue">Water (ml)</label>
                     <Input
                       type="number"
+                      inputMode="numeric"
                       className="touch-target"
                       value={hydrationGoal}
                       onChange={(e) => setHydrationGoal(Number(e.target.value))}
@@ -167,12 +228,18 @@ export default function OnboardingPage() {
             <ChevronLeft className="mr-1 h-4 w-4" /> Back
           </Button>
         )}
-        <Button onClick={next} className="flex-1 touch-target text-base font-semibold" size="lg">
+        <Button onClick={next} className="flex-1 touch-target text-base font-semibold active:scale-[0.98] transition-transform" size="lg">
           {stepIdx === steps.length - 1 ? "Let's Go" : 'Next'}
           {stepIdx < steps.length - 1 && <ChevronRight className="ml-1 h-4 w-4" />}
         </Button>
       </div>
 
+      {/* Skip links */}
+      {step === 'welcome' && (
+        <button onClick={skipAll} className="mt-3 text-xs text-muted-foreground underline">
+          Skip all — use defaults
+        </button>
+      )}
       {step === 'maxes' && (
         <button onClick={next} className="mt-3 text-xs text-muted-foreground underline">
           Skip for now
