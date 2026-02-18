@@ -34,8 +34,8 @@ const macroColors: Record<keyof MacroTargets, string> = {
   calories: 'text-neon-purple',
 };
 
-function sumFoodMacros(foods: FoodItem[]): MacroTargets {
-  return foods.reduce(
+function sumFoodMacros(foods: FoodItem[] | undefined): MacroTargets {
+  return (foods || []).reduce(
     (acc, f) => ({
       protein: acc.protein + f.protein,
       carbs: acc.carbs + f.carbs,
