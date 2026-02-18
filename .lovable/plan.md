@@ -1,54 +1,47 @@
 
 
-# Redesign Daily Macros & Meal Logging for Real-World Flow
+# Improve Meal Card UI + Add Sample Data for Testing
 
 ## Problem
 
-The current nutrition page feels like a data-entry form rather than a natural post-meal logging experience. Users have to expand collapsibles, type full macro details for each food item, and navigate multiple sheets just to log what they ate. In reality, someone finishes a meal, pulls out their phone, and wants to log it in under 10 seconds.
+1. **Meal Card UI**: The meal titles, badges, macros, and action buttons are all crammed into a single row, making them hard to read on mobile. The reorder arrows, check circle, name, badges, macros, timestamps, edit/delete buttons all compete for horizontal space.
 
-## Design Philosophy
-
-The new flow should mirror: **"I just ate. Let me log it."**
+2. **No sample data**: The app starts with empty states everywhere (no sessions, no PRs, no body measurements, no nutrition data, no hydration entries), making it impossible to test features without manually entering data first.
 
 ---
 
 ## Changes
 
-### 1. Quick-Log Meal Flow (Tap to Complete with Inline Entry)
+### 1. Redesigned MealCard Layout
 
-Instead of the current flow (expand collapsible > click add food > fill 6 fields in a sheet), tapping the check circle on a meal will open a **quick-log bottom sheet** that asks:
+Restructure the card from a single cramped horizontal row into a cleaner multi-line layout:
 
-- "What did you eat?" (optional -- can skip to just mark as done)
-- Quick macro entry right there: 4 inline number inputs (P / C / F / Cal) 
-- A "Recent Foods" row showing the last 5-10 foods the user has logged (tap to auto-add)
-- "Add detailed food item" link for users who want granular tracking
-- Big "Done" button that checks off the meal and logs the timestamp
+- **Top row**: Check circle + Meal name (larger, always visible) + Pre/Post badges + "Next up" badge
+- **Second row**: Macro summary (P / C / F / Cal) displayed as colored chips, always visible even if zero
+- **Third row** (completed only): Timestamp + food count
+- **Actions**: Edit/delete buttons aligned to the right of the top row, reorder arrows moved to a vertical strip on the left edge
 
-If the user just wants to check it off without details, a **"Skip & Complete"** link at the top lets them do that instantly.
+Key visual improvements:
+- Meal name gets `text-sm font-semibold` instead of being truncated in a tight row
+- Macro chips use colored backgrounds (not just colored text) for better visibility
+- Completed meals get a more distinct visual state with a green check overlay
+- "Next up" badge is more prominent with a pulsing dot
+- More vertical padding so content breathes
 
-### 2. Recent/Saved Foods System
+### 2. Sample Data Seed
 
-- Store a `recentFoods: FoodItem[]` array in the app store (persisted, max 20 items, deduped by name)
-- Show as horizontal scrollable chips in the quick-log sheet
-- Tap a chip to instantly add that food with its saved macros
-- This eliminates re-typing for the 80% of foods people eat repeatedly
+Create a `src/data/sampleData.ts` file with realistic test data covering all features:
 
-### 3. Meal-Level Quick Macros
+- **3 workout sessions** (past 3 days) with logged sets, PRs, volume
+- **5 personal records** (squat, bench, RDL, OHP, barbell row) with history entries
+- **4 body measurements** over 2 weeks (showing a trend)
+- **Today's nutrition** with 2 completed meals (with foods/macros) and 3 uncompleted
+- **Today's hydration** with a few entries totaling ~1500ml
+- **5 recent foods** (chicken breast, rice, eggs, protein shake, oats)
+- **Estimated maxes** filled in
+- **Macro targets** set to realistic values
 
-- Each MealCard shows a compact inline macro summary that updates live
-- When a meal is completed, show the macro contribution in a subtle colored row
-- Remove the global "Quick add macros manually" collapsible -- instead, each meal's quick-log sheet has its own macro fields, making per-meal tracking natural
-
-### 4. Visual "What's Next" Indicator
-
-- The next uncompleted meal gets a subtle highlighted border and a "Next up" badge
-- Completed meals collapse slightly (reduced padding) to push focus to what's upcoming
-- Time-based suggestion: if it's afternoon and breakfast isn't checked, show a gentle nudge
-
-### 5. Smarter Calorie Auto-Calc
-
-- When the user types Protein, Carbs, or Fats in the quick-log, the Calories field updates live (P x 4 + C x 4 + F x 9) unless manually overridden
-- Show the formula result as placeholder text so users see what will be calculated
+Add a "Load Sample Data" button on the Settings page that imports all this data at once, so the user can populate every feature with one tap.
 
 ---
 
@@ -58,42 +51,39 @@ If the user just wants to check it off without details, a **"Skip & Complete"** 
 
 | File | Changes |
 |------|---------|
-| `src/types/workout.ts` | Add `recentFoods` to `AppState` |
-| `src/stores/useAppStore.ts` | Add `recentFoods` state, `addRecentFood` action, persist it |
-| `src/pages/NutritionPage.tsx` | Full rework of meal interaction flow |
+| `src/pages/NutritionPage.tsx` | Redesigned MealCard component with better layout |
+| `src/data/sampleData.ts` | New file with comprehensive test data |
+| `src/pages/SettingsPage.tsx` | Add "Load Sample Data" button |
+| `src/stores/useAppStore.ts` | Add `loadSampleData` action |
 
-### New Components (within NutritionPage.tsx)
+### MealCard Layout Changes
 
-- **QuickLogSheet**: Bottom sheet shown when tapping a meal's check circle. Contains: skip button, recent foods chips, inline P/C/F/Cal inputs, detailed food add link, done button.
-- **RecentFoodChip**: Horizontal scrollable chip component showing food name + calories, tap to add.
-- Refactored **MealCard**: Slimmer completed state, "Next up" badge logic, per-meal macro summary always visible (no collapsible needed for basic info).
-
-### Store Changes
-
+Current layout (single row, everything horizontal):
 ```
-// New state
-recentFoods: FoodItem[]  // max 20, most recent first
-
-// New action  
-addRecentFood: (food: FoodItem) => void
-// Dedupes by name, keeps max 20, prepends new
+[arrows] [check] [name badges macros timestamp] [edit delete]
 ```
 
-### Flow Diagram
+New layout (structured vertically):
+```
+[arrows] | [check] [Meal Name]  [Pre] [Next up]  [edit] [delete]
+         |         P:42  C:65  F:12  · 540cal
+         |         Completed at 12:30 PM · 3 foods
+```
 
-1. User taps meal check circle
-2. QuickLogSheet opens with: recent foods row + macro inputs
-3. User either:
-   a. Taps recent food chips (auto-fills macros) and hits Done
-   b. Types quick macros manually and hits Done  
-   c. Taps "Add detailed food" to open the existing AddFoodSheet
-   d. Taps "Skip & Complete" to just check off
-4. Meal is marked complete with timestamp, macros are added to daily totals
-5. Any new food items are saved to recentFoods for next time
+### Sample Data Structure
 
-### Data Safety
+The sample data will use dates relative to "today" so it always looks current:
+- Sessions: today-1, today-2, today-4
+- Body measurements: today, today-5, today-10, today-14
+- Nutrition: today (with 2 completed meals + foods)
+- Hydration: today (3 entries, ~1500ml)
+- Recent foods: 5 common bodybuilding foods with realistic macros
+- PRs: 5 compound lifts with 3-4 history entries each
 
-- All existing meal data and templates remain compatible
-- `recentFoods` defaults to `[]` for existing users
-- The `foods` array fallback (`|| []`) is preserved throughout
+### Settings Page Addition
+
+A "Developer / Testing" section at the bottom of the Settings page with:
+- "Load Sample Data" button that calls `loadSampleData()`
+- Toast confirmation after loading
+- Warning that it will merge with (not replace) existing data
 
