@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Trophy, Scale, Plus, TrendingUp } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Trophy, Scale, Plus, ArrowLeftRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { PersonalRecord, MuscleGroup, BodyMeasurement } from '@/types/workout';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -34,22 +36,18 @@ function groupPRsByMuscle(
   workoutPlan: any
 ): Record<string, PersonalRecord[]> {
   const groups: Record<string, PersonalRecord[]> = {};
-
-  // Build exercise → muscle groups map from workout plan
   const exerciseMuscles: Record<string, MuscleGroup[]> = {};
   for (const day of workoutPlan.days) {
     for (const ex of day.exercises) {
       exerciseMuscles[ex.id] = ex.muscleGroups;
     }
   }
-
   for (const pr of Object.values(records)) {
     const muscles = exerciseMuscles[pr.exerciseId] ?? ['other'];
     const primaryMuscle = muscles[0] ?? 'other';
     if (!groups[primaryMuscle]) groups[primaryMuscle] = [];
     groups[primaryMuscle].push(pr);
   }
-
   return groups;
 }
 
@@ -65,6 +63,143 @@ const measurementFields = [
   { key: 'rightCalf', label: 'Right Calf', unit: 'cm' },
 ] as const;
 
+// ========== BODYWEIGHT CHART ==========
+function BodyweightChart({ measurements }: { measurements: BodyMeasurement[] }) {
+  const data = useMemo(() => {
+    return measurements
+      .filter((m) => m.bodyweight)
+      .map((m) => ({
+        date: format(parseISO(m.date), 'MMM d'),
+        weight: m.bodyweight,
+      }))
+      .reverse(); // chronological
+  }, [measurements]);
+
+  if (data.length < 2) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="mb-3 text-xs font-semibold text-muted-foreground">Bodyweight Trend</p>
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+              tickLine={false}
+              axisLine={false}
+              domain={['auto', 'auto']}
+              width={35}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+            />
+            <Line
+              type="monotone"
+              dataKey="weight"
+              stroke="hsl(var(--primary))"
+              strokeWidth={2}
+              dot={{ fill: 'hsl(var(--primary))', r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ========== DATE COMPARISON ==========
+function DateComparison({ measurements }: { measurements: BodyMeasurement[] }) {
+  const [dateA, setDateA] = useState('');
+  const [dateB, setDateB] = useState('');
+
+  if (measurements.length < 2) return null;
+
+  const mA = measurements.find((m) => m.id === dateA);
+  const mB = measurements.find((m) => m.id === dateB);
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <ArrowLeftRight className="h-4 w-4 text-primary" />
+          <p className="text-xs font-semibold">Compare Dates</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <Select value={dateA} onValueChange={setDateA}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Date A" />
+            </SelectTrigger>
+            <SelectContent>
+              {measurements.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">
+                  {format(parseISO(m.date), 'MMM d, yyyy')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={dateB} onValueChange={setDateB}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Date B" />
+            </SelectTrigger>
+            <SelectContent>
+              {measurements.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">
+                  {format(parseISO(m.date), 'MMM d, yyyy')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {mA && mB && (
+          <div className="rounded-lg bg-muted/50 p-3">
+            <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-muted-foreground mb-1.5">
+              <span>Metric</span>
+              <span>{format(parseISO(mA.date), 'MMM d')}</span>
+              <span>{format(parseISO(mB.date), 'MMM d')}</span>
+              <span>Diff</span>
+            </div>
+            {measurementFields.map(({ key, label, unit }) => {
+              const valA = (mA as any)[key] as number | undefined;
+              const valB = (mB as any)[key] as number | undefined;
+              if (!valA && !valB) return null;
+              const diff = valA && valB ? valB - valA : null;
+              return (
+                <div key={key} className="grid grid-cols-4 gap-1 text-xs py-0.5">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span>{valA ? `${valA}${unit}` : '—'}</span>
+                  <span>{valB ? `${valB}${unit}` : '—'}</span>
+                  <span className={
+                    diff === null ? 'text-muted-foreground' :
+                    diff > 0 ? 'text-neon font-semibold' :
+                    diff < 0 ? 'text-neon-red font-semibold' : 'text-muted-foreground'
+                  }>
+                    {diff === null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ========== MAIN PAGE ==========
 export default function RecordsPage() {
   const { personalRecords, workoutPlan, bodyMeasurements, addBodyMeasurement } = useAppStore();
   const [selectedPR, setSelectedPR] = useState<PersonalRecord | null>(null);
@@ -77,7 +212,6 @@ export default function RecordsPage() {
   const handleSaveMeasurement = () => {
     const hasValues = Object.values(measurementForm).some((v) => v !== undefined && v > 0);
     if (!hasValues) return;
-
     const measurement: BodyMeasurement = {
       id: `bm_${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -90,7 +224,7 @@ export default function RecordsPage() {
 
   return (
     <>
-      <motion.div className="flex flex-col gap-4 p-4 pt-6" variants={container} initial="hidden" animate="show">
+      <motion.div className="flex flex-col gap-4 p-4 pt-6 pb-24" variants={container} initial="hidden" animate="show">
         <motion.div variants={item}>
           <h1 className="font-display text-2xl font-bold">Records</h1>
           <p className="text-sm text-muted-foreground">PRs & body measurements</p>
@@ -141,7 +275,7 @@ export default function RecordsPage() {
                                 <div className="mt-1 flex gap-3 text-[10px] text-muted-foreground">
                                   <span>🏋️ {pr.bestWeight}kg</span>
                                   <span>🔁 {pr.bestReps} reps</span>
-                                  <span>📊 {(pr.bestVolume / 1).toFixed(0)} vol</span>
+                                  <span>📊 {pr.bestVolume} vol</span>
                                 </div>
                               </div>
                               <Trophy className="h-4 w-4 text-neon-amber/60" />
@@ -174,8 +308,23 @@ export default function RecordsPage() {
               </motion.div>
             )}
 
+            {/* Bodyweight Chart */}
+            {bodyMeasurements.length >= 2 && (
+              <motion.div variants={item}>
+                <BodyweightChart measurements={bodyMeasurements} />
+              </motion.div>
+            )}
+
+            {/* Date Comparison */}
+            {bodyMeasurements.length >= 2 && (
+              <motion.div variants={item}>
+                <DateComparison measurements={bodyMeasurements} />
+              </motion.div>
+            )}
+
+            {/* Measurement History */}
             {bodyMeasurements.map((m, idx) => {
-              const prev = bodyMeasurements[idx + 1]; // older
+              const prev = bodyMeasurements[idx + 1];
               return (
                 <motion.div key={m.id} variants={item}>
                   <Card>
@@ -243,17 +392,14 @@ export default function RecordsPage() {
                     <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-muted-foreground">
                       <span>Date</span><span>Weight</span><span>Reps</span><span>RPE</span>
                     </div>
-                    {selectedPR.history
-                      .slice()
-                      .reverse()
-                      .map((entry, i) => (
-                        <div key={i} className="grid grid-cols-4 gap-1 text-xs py-0.5">
-                          <span>{entry.date}</span>
-                          <span>{entry.weight}kg</span>
-                          <span>{entry.reps}</span>
-                          <span>{entry.rpe}</span>
-                        </div>
-                      ))}
+                    {selectedPR.history.slice().reverse().map((entry, i) => (
+                      <div key={i} className="grid grid-cols-4 gap-1 text-xs py-0.5">
+                        <span>{entry.date}</span>
+                        <span>{entry.weight}kg</span>
+                        <span>{entry.reps}</span>
+                        <span>{entry.rpe}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
