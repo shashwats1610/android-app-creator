@@ -13,6 +13,7 @@ import WorkoutDayPage from "@/pages/WorkoutDayPage";
 import HistoryPage from "@/pages/HistoryPage";
 import RecordsPage from "@/pages/RecordsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import NutritionPage from "@/pages/NutritionPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/records" element={<RecordsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/nutrition" element={<NutritionPage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
