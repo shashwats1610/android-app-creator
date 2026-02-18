@@ -140,8 +140,8 @@ export const samplePersonalRecords: Record<string, PersonalRecord> = {
       { date: twoDaysAgo, weight: 85, reps: 8, rpe: 7 },
     ],
   },
-  ex_28: {
-    exerciseId: 'ex_28', exerciseName: 'Romanian Deadlift (RDL)',
+  ex_29: {
+    exerciseId: 'ex_29', exerciseName: 'Romanian Deadlift (RDL)',
     bestWeight: 100, bestWeightDate: format(subDays(now, 3), 'yyyy-MM-dd'),
     bestReps: 10, bestRepsDate: format(subDays(now, 3), 'yyyy-MM-dd'),
     bestVolume: 1000, bestVolumeDate: format(subDays(now, 3), 'yyyy-MM-dd'),

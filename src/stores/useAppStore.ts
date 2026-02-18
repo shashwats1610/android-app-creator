@@ -17,11 +17,6 @@ import type {
   FoodItem,
 } from '@/types/workout';
 import { defaultWorkoutPlan } from '@/data/workoutPlan';
-import {
-  sampleSessions, samplePersonalRecords, sampleBodyMeasurements,
-  sampleRecentFoods, sampleDailyNutrition, sampleDailyHydration,
-  sampleEstimatedMaxes, sampleMacroTargets,
-} from '@/data/sampleData';
 
 const defaultSettings: UserSettings = {
   onboardingComplete: false,
@@ -91,7 +86,7 @@ interface AppActions {
   exportData: () => string;
   importData: (json: string) => boolean;
   resetAllData: () => void;
-  loadSampleData: () => void;
+  loadSampleData: (data: Partial<AppState>) => void;
 }
 
 type Store = AppState & AppActions;
@@ -361,22 +356,21 @@ export const useAppStore = create<Store>()(
           recentFoods: [],
         }),
 
-      loadSampleData: () =>
+      loadSampleData: (data) =>
         set((s) => ({
+          ...s,
+          ...data,
           settings: {
             ...s.settings,
-            onboardingComplete: true,
-            estimatedMaxes: sampleEstimatedMaxes,
-            macroTargets: sampleMacroTargets,
-            hydrationGoal: 3000,
+            ...(data.settings || {}),
           },
-          sessions: [...sampleSessions, ...s.sessions],
-          personalRecords: { ...s.personalRecords, ...samplePersonalRecords },
-          bodyMeasurements: [...sampleBodyMeasurements, ...s.bodyMeasurements],
-          dailyNutrition: { ...s.dailyNutrition, ...sampleDailyNutrition },
-          dailyHydration: { ...s.dailyHydration, ...sampleDailyHydration },
-          recentFoods: [...sampleRecentFoods, ...(s.recentFoods || [])].slice(0, 20),
-          streak: Math.max(s.streak, 3),
+          sessions: [...(data.sessions || []), ...s.sessions],
+          personalRecords: { ...s.personalRecords, ...(data.personalRecords || {}) },
+          bodyMeasurements: [...(data.bodyMeasurements || []), ...s.bodyMeasurements],
+          dailyNutrition: { ...s.dailyNutrition, ...(data.dailyNutrition || {}) },
+          dailyHydration: { ...s.dailyHydration, ...(data.dailyHydration || {}) },
+          recentFoods: [...(data.recentFoods || []), ...(s.recentFoods || [])].slice(0, 20),
+          streak: Math.max(s.streak, data.streak || 0),
         })),
     }),
     {
