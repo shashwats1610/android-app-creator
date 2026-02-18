@@ -1,89 +1,85 @@
 
 
-# Improve Meal Card UI + Add Sample Data for Testing
+# Create Comprehensive Technical Handoff Document
 
-## Problem
+## What
 
-1. **Meal Card UI**: The meal titles, badges, macros, and action buttons are all crammed into a single row, making them hard to read on mobile. The reorder arrows, check circle, name, badges, macros, timestamps, edit/delete buttons all compete for horizontal space.
+Create a detailed `TECHNICAL_HANDOFF.md` file at the project root that serves as a complete reference for Antigravity, Cursor, or any developer to understand the entire app architecture and build a backend from it.
 
-2. **No sample data**: The app starts with empty states everywhere (no sessions, no PRs, no body measurements, no nutrition data, no hydration entries), making it impossible to test features without manually entering data first.
+## Why
 
----
+Currently, the only documentation is the default Lovable README with no project-specific information. A developer picking up this project would need to manually trace through every file to understand the data models, state management, feature set, and how things connect.
 
-## Changes
+## What the File Will Cover
 
-### 1. Redesigned MealCard Layout
+### 1. Project Overview
+- App purpose (hypertrophy/bodybuilding tracker), mobile-first React SPA
+- Tech stack: React 18, Vite, TypeScript, Zustand, Tailwind CSS, shadcn/ui, Framer Motion, Recharts
+- Designed for future conversion to React Native / Android APK
 
-Restructure the card from a single cramped horizontal row into a cleaner multi-line layout:
+### 2. Architecture
+- File structure map (pages, components, stores, types, data, lib, hooks)
+- Routing table: all 14 routes mapped to their pages and purpose
+- State management: single Zustand store with localStorage persistence
 
-- **Top row**: Check circle + Meal name (larger, always visible) + Pre/Post badges + "Next up" badge
-- **Second row**: Macro summary (P / C / F / Cal) displayed as colored chips, always visible even if zero
-- **Third row** (completed only): Timestamp + food count
-- **Actions**: Edit/delete buttons aligned to the right of the top row, reorder arrows moved to a vertical strip on the left edge
+### 3. Complete Data Model Reference
+- Every TypeScript interface from `src/types/workout.ts` documented with field descriptions
+- 17 muscle group enums, 4 exercise types
+- Entity relationships: WorkoutPlan > WorkoutDay > Exercise, Session > LoggedExercise > LoggedSet, etc.
 
-Key visual improvements:
-- Meal name gets `text-sm font-semibold` instead of being truncated in a tight row
-- Macro chips use colored backgrounds (not just colored text) for better visibility
-- Completed meals get a more distinct visual state with a green check overlay
-- "Next up" badge is more prominent with a pulsing dot
-- More vertical padding so content breathes
+### 4. Store Actions (API Surface)
+- All 25+ store actions grouped by domain (Settings, Workout Plan, Sessions, Records, Nutrition, Hydration, Data Management)
+- Input/output types for each action
+- Business logic notes (streak calculation, PR tracking, progressive overload algorithm)
 
-### 2. Sample Data Seed
+### 5. Feature Inventory
+- **Onboarding**: estimated maxes, macro targets, hydration goal setup
+- **Workout Plan**: 7-day hypertrophy split, 70+ exercises with form cues, superset support
+- **Live Session**: set logging with weight/reps/RPE, rest timer with vibration, plate calculator, progressive overload recommendations
+- **Personal Records**: weight/reps/volume PRs per exercise, history tracking
+- **Body Measurements**: 9 measurement points, trend charts
+- **Nutrition**: 5-meal daily plan, quick-log sheet, recent foods system, macro auto-calculation, meal templates
+- **Hydration**: daily goal tracking, quick-add buttons
+- **Settings**: theme toggle, data export/import/reset, sample data loader
 
-Create a `src/data/sampleData.ts` file with realistic test data covering all features:
+### 6. Progressive Overload Algorithm
+- Documented from `src/lib/progressiveOverload.ts`
+- 4 recommendation states: add_weight, maintain, consolidate, stall
+- Weight increment rules (5kg lower body, 2.5kg upper body)
+- Stall detection across 3+ sessions
 
-- **3 workout sessions** (past 3 days) with logged sets, PRs, volume
-- **5 personal records** (squat, bench, RDL, OHP, barbell row) with history entries
-- **4 body measurements** over 2 weeks (showing a trend)
-- **Today's nutrition** with 2 completed meals (with foods/macros) and 3 uncompleted
-- **Today's hydration** with a few entries totaling ~1500ml
-- **5 recent foods** (chicken breast, rice, eggs, protein shake, oats)
-- **Estimated maxes** filled in
-- **Macro targets** set to realistic values
+### 7. Default Workout Plan
+- All 7 days with exercise IDs, muscle groups, set/rep schemes
+- Superset pairings on Days 5 and 7
+- Exercise ID mapping (ex_1 through ex_70+) critical for PR/session linkage
 
-Add a "Load Sample Data" button on the Settings page that imports all this data at once, so the user can populate every feature with one tap.
+### 8. Backend Migration Guide
+- Current storage: Zustand + localStorage (key: `hypertrophy-tracker-storage`)
+- Suggested database tables mapping to TypeScript interfaces
+- Auth considerations (currently none -- single user)
+- API endpoints that would replace each store action
+- Data sync strategy for offline-first mobile app
+
+### 9. React Native Migration Notes
+- Component mapping: shadcn/ui to React Native equivalents
+- Navigation: react-router-dom to React Navigation
+- Charts: Recharts to react-native-chart-kit or Victory Native
+- Animations: Framer Motion to React Native Reanimated
+- Storage: localStorage to AsyncStorage or MMKV
 
 ---
 
 ## Technical Details
 
-### Files Modified
+### File Created
 
-| File | Changes |
-|------|---------|
-| `src/pages/NutritionPage.tsx` | Redesigned MealCard component with better layout |
-| `src/data/sampleData.ts` | New file with comprehensive test data |
-| `src/pages/SettingsPage.tsx` | Add "Load Sample Data" button |
-| `src/stores/useAppStore.ts` | Add `loadSampleData` action |
+| File | Description |
+|------|-------------|
+| `TECHNICAL_HANDOFF.md` | ~800-line comprehensive reference document |
 
-### MealCard Layout Changes
+### Key Data Points Included
 
-Current layout (single row, everything horizontal):
-```
-[arrows] [check] [name badges macros timestamp] [edit delete]
-```
+The document will contain exact exercise ID mappings (e.g., `ex_1` = Back Squat, `ex_10` = Bench Press, `ex_29` = RDL) which are critical for the backend to correctly link sessions, PRs, and progressive overload recommendations.
 
-New layout (structured vertically):
-```
-[arrows] | [check] [Meal Name]  [Pre] [Next up]  [edit] [delete]
-         |         P:42  C:65  F:12  · 540cal
-         |         Completed at 12:30 PM · 3 foods
-```
-
-### Sample Data Structure
-
-The sample data will use dates relative to "today" so it always looks current:
-- Sessions: today-1, today-2, today-4
-- Body measurements: today, today-5, today-10, today-14
-- Nutrition: today (with 2 completed meals + foods)
-- Hydration: today (3 entries, ~1500ml)
-- Recent foods: 5 common bodybuilding foods with realistic macros
-- PRs: 5 compound lifts with 3-4 history entries each
-
-### Settings Page Addition
-
-A "Developer / Testing" section at the bottom of the Settings page with:
-- "Load Sample Data" button that calls `loadSampleData()`
-- Toast confirmation after loading
-- Warning that it will merge with (not replace) existing data
+It will also include the complete store action signatures so a backend developer can create matching API endpoints without needing to read the Zustand store code.
 
