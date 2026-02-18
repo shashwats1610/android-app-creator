@@ -232,4 +232,5 @@ export interface AppState {
   inProgressSession: InProgressSession | null;
   streak: number;
   mealTemplates: import('@/types/workout').MealTemplate[];
+  recentFoods: FoodItem[]; // max 20, most recent first
 }
