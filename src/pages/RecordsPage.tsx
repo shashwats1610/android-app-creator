@@ -63,16 +63,50 @@ const measurementFields = [
   { key: 'rightCalf', label: 'Right Calf', unit: 'cm' },
 ] as const;
 
+// ========== LINEAR REGRESSION ==========
+function linearRegression(points: { x: number; y: number }[]): { slope: number; intercept: number } {
+  const n = points.length;
+  if (n < 2) return { slope: 0, intercept: points[0]?.y ?? 0 };
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
+
 // ========== BODYWEIGHT CHART ==========
 function BodyweightChart({ measurements }: { measurements: BodyMeasurement[] }) {
-  const data = useMemo(() => {
-    return measurements
+  const { data, trendData, summary } = useMemo(() => {
+    const filtered = measurements
       .filter((m) => m.bodyweight)
       .map((m) => ({
         date: format(parseISO(m.date), 'MMM d'),
-        weight: m.bodyweight,
+        weight: m.bodyweight!,
+        rawDate: new Date(m.date).getTime(),
       }))
-      .reverse(); // chronological
+      .reverse();
+
+    // Trend line
+    const points = filtered.map((d, i) => ({ x: i, y: d.weight }));
+    const { slope, intercept } = linearRegression(points);
+    const trend = filtered.map((d, i) => ({
+      ...d,
+      trend: Math.round((intercept + slope * i) * 10) / 10,
+    }));
+
+    // Summary stats
+    const first = filtered[0]?.weight ?? 0;
+    const last = filtered[filtered.length - 1]?.weight ?? 0;
+    const change = last - first;
+    const avg = filtered.length > 0 ? filtered.reduce((s, d) => s + d.weight, 0) / filtered.length : 0;
+
+    return {
+      data: trend,
+      trendData: trend,
+      summary: { first, last, change, avg, count: filtered.length, weeklyRate: filtered.length >= 2 ? (slope * 7) : 0 },
+    };
   }, [measurements]);
 
   if (data.length < 2) return null;
@@ -80,9 +114,40 @@ function BodyweightChart({ measurements }: { measurements: BodyMeasurement[] }) 
   return (
     <Card>
       <CardContent className="p-4">
-        <p className="mb-3 text-xs font-semibold text-muted-foreground">Bodyweight Trend</p>
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-xs font-semibold text-muted-foreground">Bodyweight Trend</p>
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-3 rounded-full bg-primary" /> Actual
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-3 rounded-full bg-muted-foreground/50" style={{ borderTop: '2px dashed' }} /> Trend
+            </span>
+          </div>
+        </div>
+
+        {/* Summary row */}
+        <div className="mb-3 grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-muted/50 p-2 text-center">
+            <span className="text-sm font-bold font-display">{summary.last.toFixed(1)}</span>
+            <p className="text-[9px] text-muted-foreground">Current (kg)</p>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-2 text-center">
+            <span className={`text-sm font-bold font-display ${summary.change > 0 ? 'text-primary' : summary.change < 0 ? 'text-neon-blue' : ''}`}>
+              {summary.change > 0 ? '+' : ''}{summary.change.toFixed(1)}
+            </span>
+            <p className="text-[9px] text-muted-foreground">Change (kg)</p>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-2 text-center">
+            <span className={`text-sm font-bold font-display ${summary.weeklyRate > 0 ? 'text-primary' : summary.weeklyRate < 0 ? 'text-neon-blue' : ''}`}>
+              {summary.weeklyRate > 0 ? '+' : ''}{summary.weeklyRate.toFixed(2)}
+            </span>
+            <p className="text-[9px] text-muted-foreground">Per week (kg)</p>
+          </div>
+        </div>
+
         <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={data}>
+          <LineChart data={trendData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
               dataKey="date"
@@ -113,6 +178,15 @@ function BodyweightChart({ measurements }: { measurements: BodyMeasurement[] }) 
               strokeWidth={2}
               dot={{ fill: 'hsl(var(--primary))', r: 3 }}
               activeDot={{ r: 5 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="trend"
+              stroke="hsl(var(--muted-foreground))"
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              dot={false}
+              activeDot={false}
             />
           </LineChart>
         </ResponsiveContainer>
