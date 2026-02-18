@@ -3,7 +3,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Sun, Moon, Download, Upload, Trash2 } from 'lucide-react';
+import { Sun, Moon, Download, Upload, Trash2, Dumbbell, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const { exportData, importData, resetAllData, settings } = useAppStore();
   const [resetText, setResetText] = useState('');
   const [showReset, setShowReset] = useState(false);
@@ -65,6 +67,22 @@ export default function SettingsPage() {
               <span className="text-sm font-medium">Dark Mode</span>
             </div>
             <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme} />
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Edit Workout Plan */}
+      <motion.div variants={item}>
+        <Card className="cursor-pointer transition-colors hover:bg-accent/50" onClick={() => navigate('/workout/edit')}>
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <Dumbbell className="h-5 w-5 text-primary" />
+              <div>
+                <span className="text-sm font-medium">Edit Workout Plan</span>
+                <p className="text-[10px] text-muted-foreground">Add, remove, reorder days & exercises</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </CardContent>
         </Card>
       </motion.div>

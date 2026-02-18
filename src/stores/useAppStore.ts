@@ -45,6 +45,14 @@ interface AppActions {
 
   // Workout Plan
   updateWorkoutPlan: (plan: WorkoutPlan) => void;
+  updateWorkoutDay: (dayId: string, updates: Partial<import('@/types/workout').WorkoutDay>) => void;
+  addWorkoutDay: (day: import('@/types/workout').WorkoutDay) => void;
+  removeWorkoutDay: (dayId: string) => void;
+  reorderWorkoutDays: (dayIds: string[]) => void;
+  updateExercise: (dayId: string, exerciseId: string, updates: Partial<import('@/types/workout').Exercise>) => void;
+  addExercise: (dayId: string, exercise: import('@/types/workout').Exercise) => void;
+  removeExercise: (dayId: string, exerciseId: string) => void;
+  reorderExercises: (dayId: string, exerciseIds: string[]) => void;
 
   // Sessions
   startSession: (session: InProgressSession) => void;
@@ -116,6 +124,85 @@ export const useAppStore = create<Store>()(
 
       // Workout Plan
       updateWorkoutPlan: (plan) => set({ workoutPlan: plan }),
+
+      updateWorkoutDay: (dayId, updates) =>
+        set((s) => ({
+          workoutPlan: {
+            ...s.workoutPlan,
+            days: s.workoutPlan.days.map((d) => (d.id === dayId ? { ...d, ...updates } : d)),
+          },
+        })),
+
+      addWorkoutDay: (day) =>
+        set((s) => ({
+          workoutPlan: { ...s.workoutPlan, days: [...s.workoutPlan.days, day] },
+        })),
+
+      removeWorkoutDay: (dayId) =>
+        set((s) => ({
+          workoutPlan: {
+            ...s.workoutPlan,
+            days: s.workoutPlan.days.filter((d) => d.id !== dayId),
+          },
+        })),
+
+      reorderWorkoutDays: (dayIds) =>
+        set((s) => {
+          const map = Object.fromEntries(s.workoutPlan.days.map((d) => [d.id, d]));
+          return {
+            workoutPlan: {
+              ...s.workoutPlan,
+              days: dayIds.map((id, i) => ({ ...map[id], dayNumber: i + 1 })),
+            },
+          };
+        }),
+
+      updateExercise: (dayId, exerciseId, updates) =>
+        set((s) => ({
+          workoutPlan: {
+            ...s.workoutPlan,
+            days: s.workoutPlan.days.map((d) =>
+              d.id === dayId
+                ? { ...d, exercises: d.exercises.map((ex) => (ex.id === exerciseId ? { ...ex, ...updates } : ex)) }
+                : d
+            ),
+          },
+        })),
+
+      addExercise: (dayId, exercise) =>
+        set((s) => ({
+          workoutPlan: {
+            ...s.workoutPlan,
+            days: s.workoutPlan.days.map((d) =>
+              d.id === dayId ? { ...d, exercises: [...d.exercises, exercise] } : d
+            ),
+          },
+        })),
+
+      removeExercise: (dayId, exerciseId) =>
+        set((s) => ({
+          workoutPlan: {
+            ...s.workoutPlan,
+            days: s.workoutPlan.days.map((d) =>
+              d.id === dayId ? { ...d, exercises: d.exercises.filter((ex) => ex.id !== exerciseId) } : d
+            ),
+          },
+        })),
+
+      reorderExercises: (dayId, exerciseIds) =>
+        set((s) => {
+          const day = s.workoutPlan.days.find((d) => d.id === dayId);
+          if (!day) return s;
+          const map = Object.fromEntries(day.exercises.map((ex) => [ex.id, ex]));
+          return {
+            workoutPlan: {
+              ...s.workoutPlan,
+              days: s.workoutPlan.days.map((d) =>
+                d.id === dayId ? { ...d, exercises: exerciseIds.map((id) => map[id]) } : d
+              ),
+            },
+          };
+        }),
 
       // Sessions
       startSession: (inProgress) => set({ inProgressSession: inProgress }),
