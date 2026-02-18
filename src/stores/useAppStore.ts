@@ -211,10 +211,23 @@ export const useAppStore = create<Store>()(
         set({ inProgressSession: inProgress }),
 
       completeSession: (session) =>
-        set((s) => ({
-          sessions: [session, ...s.sessions],
-          inProgressSession: null,
-        })),
+        set((s) => {
+          const allSessions = [session, ...s.sessions];
+          const uniqueDates = [...new Set(allSessions.map(sess => sess.date))].sort().reverse();
+          let streak = 1;
+          for (let i = 0; i < uniqueDates.length - 1; i++) {
+            const curr = new Date(uniqueDates[i]);
+            const next = new Date(uniqueDates[i + 1]);
+            const gap = Math.floor((curr.getTime() - next.getTime()) / 86400000);
+            if (gap <= 3) streak++;
+            else break;
+          }
+          return {
+            sessions: allSessions,
+            inProgressSession: null,
+            streak,
+          };
+        }),
 
       clearInProgressSession: () => set({ inProgressSession: null }),
 

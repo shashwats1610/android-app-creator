@@ -203,6 +203,14 @@ export default function HistoryPage() {
                 </div>
               </div>
 
+              {/* Session Notes */}
+              {selectedSession.notes && (
+                <div className="mt-4 rounded-lg bg-muted/50 p-3">
+                  <p className="text-[11px] font-semibold text-muted-foreground mb-1">Session Notes</p>
+                  <p className="text-xs leading-relaxed">{selectedSession.notes}</p>
+                </div>
+              )}
+
               {/* Exercises detail */}
               <div className="mt-4 flex flex-col gap-3">
                 {selectedSession.exercises.map((ex) => (
@@ -227,6 +235,9 @@ export default function HistoryPage() {
                       </div>
                     ) : (
                       <p className="mt-1 text-[10px] text-muted-foreground italic">Skipped</p>
+                    )}
+                    {ex.notes && (
+                      <p className="mt-2 text-[10px] text-muted-foreground italic border-t border-border pt-1.5">{ex.notes}</p>
                     )}
                   </div>
                 ))}
