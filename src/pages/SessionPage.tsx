@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAppStore } from '@/stores/useAppStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -692,6 +693,7 @@ export default function SessionPage() {
                           amount: 250,
                           timestamp: new Date().toISOString(),
                         });
+                        toast.success('💧 250ml logged!', { duration: 1500 });
                       }}
                     >
                       <Plus className="mr-1 h-3 w-3" /> 250ml
