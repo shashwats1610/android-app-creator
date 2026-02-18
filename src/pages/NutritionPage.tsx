@@ -536,115 +536,137 @@ function MealCard({
 
   return (
     <Card
-      className={`transition-all duration-200 ${
+      className={`transition-all duration-200 overflow-hidden ${
         meal.completed
-          ? 'border-primary/20 bg-primary/5 opacity-80'
+          ? 'border-primary/20 bg-primary/5'
           : isNextUp
           ? 'border-primary/40 ring-1 ring-primary/20 shadow-sm'
           : ''
       }`}
     >
-      <CardContent className={`p-0 ${meal.completed ? 'py-0' : ''}`}>
-        {/* Next up badge */}
-        {isNextUp && !meal.completed && (
-          <div className="flex items-center gap-1 px-3 pt-2 pb-0">
-            <ArrowRight className="h-3 w-3 text-primary" />
-            <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Next up</span>
-          </div>
-        )}
-
-        {/* Main row */}
-        <div className={`flex items-center gap-2 ${meal.completed ? 'p-2.5' : 'p-3'}`}>
-          {/* Reorder */}
-          <div className="flex flex-col gap-0.5">
-            <button type="button" onClick={onMoveUp} disabled={isFirst} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20" aria-label="Move up">
-              <ChevronUp className="h-3 w-3" />
+      <CardContent className="p-0">
+        <div className="flex">
+          {/* Left: reorder strip */}
+          <div className="flex flex-col items-center justify-center gap-0.5 px-1.5 border-r border-border/50 bg-muted/20">
+            <button type="button" onClick={onMoveUp} disabled={isFirst} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 p-0.5" aria-label="Move up">
+              <ChevronUp className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={onMoveDown} disabled={isLast} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20" aria-label="Move down">
-              <ChevronDown className="h-3 w-3" />
+            <button type="button" onClick={onMoveDown} disabled={isLast} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 p-0.5" aria-label="Move down">
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {/* Check circle — opens QuickLogSheet */}
-          <button type="button" onClick={onTapCheck} className="touch-target shrink-0">
-            <div
-              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
-                meal.completed
-                  ? 'border-primary bg-primary scale-100'
-                  : isNextUp
-                  ? 'border-primary/60 scale-110'
-                  : 'border-muted-foreground/30'
-              }`}
-            >
-              {meal.completed && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+          {/* Right: main content */}
+          <div className="flex-1 min-w-0 py-2.5 px-3">
+            {/* Row 1: Check + Name + Badges + Actions */}
+            <div className="flex items-center gap-2.5">
+              {/* Check circle */}
+              <button type="button" onClick={onTapCheck} className="shrink-0">
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
+                    meal.completed
+                      ? 'border-primary bg-primary'
+                      : isNextUp
+                      ? 'border-primary/60 scale-110'
+                      : 'border-muted-foreground/30'
+                  }`}
+                >
+                  {meal.completed && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+                </div>
+              </button>
+
+              {/* Name + badges */}
+              <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+                <span className={`text-sm font-semibold ${meal.completed ? 'line-through text-muted-foreground' : ''}`}>
+                  {meal.name}
+                </span>
+                {meal.isPreWorkout && (
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 shrink-0">Pre</Badge>
+                )}
+                {meal.isPostWorkout && (
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 shrink-0">Post</Badge>
+                )}
+                {isNextUp && !meal.completed && (
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase tracking-wider shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    Next
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button type="button" onClick={onEdit} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50" aria-label="Edit meal">
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" onClick={onDelete} className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10" aria-label="Delete meal">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          </button>
 
-          {/* Name & info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className={`text-sm font-medium truncate ${meal.completed ? 'line-through text-muted-foreground' : ''}`}>
-                {meal.name}
+            {/* Row 2: Macro chips — always visible */}
+            <div className="flex items-center gap-1.5 mt-1.5 ml-[34px]">
+              <span className="inline-flex items-center rounded-md bg-neon/10 px-1.5 py-0.5 text-[10px] font-semibold text-neon">
+                P:{hasAnyMacros ? mealMacros.protein : '—'}
               </span>
-              {meal.isPreWorkout && <Badge variant="secondary" className="text-[9px] shrink-0">Pre</Badge>}
-              {meal.isPostWorkout && <Badge variant="secondary" className="text-[9px] shrink-0">Post</Badge>}
+              <span className="inline-flex items-center rounded-md bg-neon-amber/10 px-1.5 py-0.5 text-[10px] font-semibold text-neon-amber">
+                C:{hasAnyMacros ? mealMacros.carbs : '—'}
+              </span>
+              <span className="inline-flex items-center rounded-md bg-neon-red/10 px-1.5 py-0.5 text-[10px] font-semibold text-neon-red">
+                F:{hasAnyMacros ? mealMacros.fats : '—'}
+              </span>
+              <span className="text-[10px] text-muted-foreground">·</span>
+              <span className="inline-flex items-center rounded-md bg-neon-purple/10 px-1.5 py-0.5 text-[10px] font-semibold text-neon-purple">
+                {hasAnyMacros ? `${mealMacros.calories}cal` : '—'}
+              </span>
             </div>
 
-            {/* Always-visible macro summary */}
-            {hasAnyMacros && (
-              <div className={`flex items-center gap-2 mt-0.5 text-[10px] ${meal.completed ? 'text-muted-foreground' : ''}`}>
-                <span className="text-neon font-medium">P{mealMacros.protein}</span>
-                <span className="text-neon-amber font-medium">C{mealMacros.carbs}</span>
-                <span className="text-neon-red font-medium">F{mealMacros.fats}</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-neon-purple font-medium">{mealMacros.calories}cal</span>
+            {/* Row 3: Completed info */}
+            {meal.completed && (
+              <div className="flex items-center gap-1.5 mt-1 ml-[34px] text-[10px] text-muted-foreground">
+                {meal.timestamp && (
+                  <>
+                    <Clock className="h-2.5 w-2.5" />
+                    <span>{format(new Date(meal.timestamp), 'h:mm a')}</span>
+                  </>
+                )}
+                {hasFoods && (
+                  <>
+                    <span>·</span>
+                    <span>{foods.length} food{foods.length !== 1 ? 's' : ''}</span>
+                  </>
+                )}
               </div>
             )}
 
-            {meal.completed && meal.timestamp && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <Clock className="h-2.5 w-2.5 text-muted-foreground" />
-                <p className="text-[10px] text-muted-foreground">{format(new Date(meal.timestamp), 'h:mm a')}</p>
-              </div>
+            {/* Expandable food list for non-completed meals */}
+            {!meal.completed && hasFoods && (
+              <Collapsible>
+                <CollapsibleTrigger className="flex w-full items-center gap-2 mt-1.5 ml-[34px] text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                  <FileText className="h-3 w-3" />
+                  <span>{foods.length} food{foods.length !== 1 ? 's' : ''} logged</span>
+                  <ChevronDown className="ml-auto h-3 w-3" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-1 ml-[34px] space-y-1">
+                    {foods.map((food) => (
+                      <div key={food.id} className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1">
+                        <div>
+                          <span className="text-xs font-medium">{food.name}</span>
+                          {food.quantity && <span className="ml-1 text-[10px] text-muted-foreground">{food.quantity}</span>}
+                          <p className="text-[10px] text-muted-foreground">
+                            P{food.protein} C{food.carbs} F{food.fats} · {food.calories}cal
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={onEdit} className="p-1.5 text-muted-foreground hover:text-foreground" aria-label="Edit meal">
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" onClick={onDelete} className="p-1.5 text-muted-foreground hover:text-destructive" aria-label="Delete meal">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
           </div>
         </div>
-
-        {/* Expanded foods for non-completed meals */}
-        {!meal.completed && hasFoods && (
-          <Collapsible>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-border px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors">
-              <FileText className="h-3 w-3" />
-              <span>{foods.length} food item{foods.length !== 1 ? 's' : ''} logged</span>
-              <ChevronDown className="ml-auto h-3 w-3" />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="border-t border-border px-3 py-2 space-y-1">
-                {foods.map((food) => (
-                  <div key={food.id} className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1">
-                    <div>
-                      <span className="text-xs font-medium">{food.name}</span>
-                      {food.quantity && <span className="ml-1 text-[10px] text-muted-foreground">{food.quantity}</span>}
-                      <p className="text-[10px] text-muted-foreground">
-                        P{food.protein} C{food.carbs} F{food.fats} · {food.calories}cal
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
       </CardContent>
     </Card>
   );
