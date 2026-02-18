@@ -139,14 +139,34 @@ export interface MacroTargets {
   calories: number;
 }
 
+export interface FoodItem {
+  id: string;
+  name: string;
+  protein: number;
+  carbs: number;
+  fats: number;
+  calories: number;
+  quantity?: string; // e.g. "200g", "1 cup"
+}
+
 export interface MealEntry {
   id: string;
-  mealNumber: number; // 1-5
+  mealNumber: number;
   name: string;
   completed: boolean;
   timestamp?: string;
   isPreWorkout?: boolean;
   isPostWorkout?: boolean;
+  foods: FoodItem[];
+  notes?: string;
+}
+
+export interface MealTemplate {
+  id: string;
+  name: string;
+  isPreWorkout?: boolean;
+  isPostWorkout?: boolean;
+  defaultFoods?: FoodItem[];
 }
 
 export interface DailyNutrition {
@@ -211,4 +231,5 @@ export interface AppState {
   dailyHydration: Record<string, DailyHydration>; // keyed by ISO date
   inProgressSession: InProgressSession | null;
   streak: number;
+  mealTemplates: import('@/types/workout').MealTemplate[];
 }
