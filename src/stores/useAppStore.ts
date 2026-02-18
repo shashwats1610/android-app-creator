@@ -17,6 +17,11 @@ import type {
   FoodItem,
 } from '@/types/workout';
 import { defaultWorkoutPlan } from '@/data/workoutPlan';
+import {
+  sampleSessions, samplePersonalRecords, sampleBodyMeasurements,
+  sampleRecentFoods, sampleDailyNutrition, sampleDailyHydration,
+  sampleEstimatedMaxes, sampleMacroTargets,
+} from '@/data/sampleData';
 
 const defaultSettings: UserSettings = {
   onboardingComplete: false,
@@ -86,6 +91,7 @@ interface AppActions {
   exportData: () => string;
   importData: (json: string) => boolean;
   resetAllData: () => void;
+  loadSampleData: () => void;
 }
 
 type Store = AppState & AppActions;
@@ -354,6 +360,24 @@ export const useAppStore = create<Store>()(
           ],
           recentFoods: [],
         }),
+
+      loadSampleData: () =>
+        set((s) => ({
+          settings: {
+            ...s.settings,
+            onboardingComplete: true,
+            estimatedMaxes: sampleEstimatedMaxes,
+            macroTargets: sampleMacroTargets,
+            hydrationGoal: 3000,
+          },
+          sessions: [...sampleSessions, ...s.sessions],
+          personalRecords: { ...s.personalRecords, ...samplePersonalRecords },
+          bodyMeasurements: [...sampleBodyMeasurements, ...s.bodyMeasurements],
+          dailyNutrition: { ...s.dailyNutrition, ...sampleDailyNutrition },
+          dailyHydration: { ...s.dailyHydration, ...sampleDailyHydration },
+          recentFoods: [...sampleRecentFoods, ...(s.recentFoods || [])].slice(0, 20),
+          streak: Math.max(s.streak, 3),
+        })),
     }),
     {
       name: 'hypertrophy-tracker-storage',

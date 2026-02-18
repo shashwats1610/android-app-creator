@@ -8,11 +8,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Sun, Moon, Download, Upload, Trash2, Dumbbell, ChevronRight, ChevronDown,
-  Target, Utensils, Timer,
+  Target, Utensils, Timer, Database,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import type { EstimatedMaxes, MacroTargets } from '@/types/workout';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -40,7 +41,7 @@ export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const {
-    exportData, importData, resetAllData, settings, workoutPlan,
+    exportData, importData, resetAllData, loadSampleData, settings, workoutPlan,
     updateEstimatedMaxes, updateMacroTargets, updateSettings,
   } = useAppStore();
   const [resetText, setResetText] = useState('');
@@ -239,6 +240,32 @@ export default function SettingsPage() {
               <Trash2 className="mr-2 h-4 w-4" /> Reset All Data
             </Button>
           </div>
+        </motion.div>
+
+        {/* Developer / Testing */}
+        <motion.div variants={item}>
+          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Developer / Testing</p>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Database className="h-5 w-5 text-neon-purple" />
+                <div>
+                  <span className="text-sm font-medium">Load Sample Data</span>
+                  <p className="text-[10px] text-muted-foreground">Populate all features with realistic test data (merges with existing)</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full touch-target text-xs"
+                onClick={() => {
+                  loadSampleData();
+                  toast.success('Sample data loaded! Check all pages to see the data.', { duration: 3000 });
+                }}
+              >
+                <Database className="mr-2 h-4 w-4" /> Load Sample Data
+              </Button>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {showReset && (
