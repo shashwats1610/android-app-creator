@@ -1,77 +1,142 @@
 
+# UI/UX Enhancement Plan for Hypertrophy App
 
-# Hypertrophy Tracker — Frontend Implementation Plan
+## Overview
+This plan covers a set of polish and usability improvements across the entire app -- from onboarding through workout sessions to history and settings. The focus is on making the app feel more premium, intuitive, and delightful to use on mobile.
 
-## Phase 1: Foundation
-- **Theming system** with Dark mode (default, gym aesthetic with neon accents) and Light mode toggle
-- **Bottom tab navigation** (5 tabs): Home, Workout, History, Records, Settings
-- **TypeScript type definitions** for all data models (exercises, sets, sessions, measurements, nutrition)
-- **Zustand state management** with localStorage persistence (maps to AsyncStorage for native)
-- **Mobile-first layout** with 48×48px minimum touch targets throughout
+---
 
-## Phase 2: Data & Onboarding
-- **Complete 7-day workout plan** pre-loaded with all exercises, sets, rep ranges, rest times, form cues, and superset pairings from the spec (Days 1-7, ~70 exercises total)
-- **3-step onboarding flow**: Welcome → Estimated 1RM input for compound lifts → Macro/hydration goals
-- All onboarding values editable later from Settings
+## 1. Page Transitions and Navigation Polish
 
-## Phase 3: Home Dashboard
-- Today's workout card with "Start Workout" button showing current day in the split
-- In-progress session recovery banner
-- Quick stats: streak counter, phase indicator, weekly summary
-- Hydration tracker widget with progress bar and quick-add buttons
-- Sunday measurement reminder banner
-- Navigation cards to Stats and Nutrition
+**Current issue:** Pages load with basic fade/slide but transitions between routes feel disconnected. Back buttons are inconsistent (some use icons, some use ghost buttons).
 
-## Phase 4: Live Workout Session (Core Feature)
-- **Pre-session screen** with progressive overload recommendations (add weight / maintain / consolidate / stall) — all editable
-- **Set logging**: weight, reps, RPE (1-10), complete button per set
-- **Per-side logging** for unilateral exercises (left/right)
-- **Time-based exercises** with countdown timer (e.g., planks)
-- **Superset handling** with visual pairing and auto-transition
-- **Rest timer** with countdown, ±15s adjust, skip button
-- **Form cue bottom sheet** per exercise
-- **Beat-last-session indicators** (green/amber) on each set
-- **PR flash celebration** animation when records are broken
-- **Hydration reminders** every 3-4 sets
-- **Session timer** with 90-min warning
-- Auto-save every logged set
+**Changes:**
+- Add shared layout transitions using framer-motion `AnimatePresence` wrapping the `<Outlet />` in `AppLayout`
+- Standardize all page headers with a reusable `PageHeader` component (back arrow + title + optional right action)
+- Add haptic-style micro-interactions: scale-on-press for buttons and cards
 
-## Phase 5: Session Complete & History
-- **Session summary**: date, day name, total sets, total volume, volume comparison, PRs broken, elapsed time
-- **History screen**: scrollable list of past sessions (reverse chronological)
-- Weekly volume summaries by muscle group (collapsible)
-- Tap any session for full detail view
-- Missed session tracking
+---
 
-## Phase 6: Records & Body Stats
-- **Personal Records board**: all exercises grouped by muscle group, best weight + reps with dates
-- PR history timeline per exercise
-- **Bodyweight graph** (line chart, last 90 days)
-- **Body measurements**: arms, chest, waist, quads, calves (left/right)
-- **Compare dates** feature: side-by-side comparison with color-coded differences
+## 2. Empty States
 
-## Phase 7: Nutrition & Hydration
-- **Daily macro tracker**: Protein, Carbs, Fats, Calories — targets vs. consumed with progress rings
-- **Meal checklist** (Meals 1-5) with checkboxes and timestamps
-- Pre/Post workout meals visually distinguished
-- Weekly adherence score
-- **Hydration tracker**: daily progress, quick-add buttons, 14-day bar chart, low-intake warnings
+**Current issue:** History, Records, and Nutrition pages show blank space when there is no data.
 
-## Phase 8: Settings & Editability
-- Edit estimated maxes for all compound lifts
-- Edit macro targets and hydration goals
-- Edit rest timer overrides per exercise
-- **Full workout plan editor**: add/remove/reorder exercises, modify sets/reps/rest/cues, edit superset pairings, add/remove days
-- Data export (JSON backup) and import with confirmation
-- Reset all data (requires typing "RESET")
-- Light/Dark mode toggle
+**Changes:**
+- Add illustrated empty states with contextual call-to-action for:
+  - History: "No workouts yet -- start your first session"
+  - Records/PRs: "Hit your first PR to see it here"
+  - Body Measurements: "Log your first weigh-in"
+- Use subtle Lucide icons + muted text + a single action button
 
-## Phase 9: Antigravity Handoff Documentation (MD File)
-- Complete component tree and file structure mapping (React web → Expo/React Native)
-- All TypeScript types and data model documentation
-- State management architecture and localStorage key mapping
-- Feature-by-feature native implementation notes
-- Native features to add: haptics, push notifications, file system access, expo-sharing
-- Capacitor/EAS build configuration guidance
-- UI component mapping table (shadcn/Radix → React Native equivalents)
+---
 
+## 3. Skeleton Loading States
+
+**Current issue:** Pages pop in abruptly when data loads from Zustand (persisted storage).
+
+**Changes:**
+- Add skeleton pulse placeholders for the Home page cards, History week groups, and Records tabs while store hydrates
+- Use the existing `Skeleton` UI component from shadcn
+
+---
+
+## 4. Session Page UX Improvements
+
+**Current issue:** The session screen is functional but dense. The rest timer is full-screen but lacks personality.
+
+**Changes:**
+- Add a circular progress ring to the rest timer (replacing the linear progress bar) for a more visually engaging countdown
+- Add a subtle vibration pattern completion cue (via `navigator.vibrate` where supported)
+- Show a "swipe to next exercise" gesture hint on first use
+- Animate the set completion checkmark with a satisfying spring animation
+- Add a confetti/particle burst on PR detection (lightweight CSS-only)
+
+---
+
+## 5. Bottom Navigation Enhancements
+
+**Current issue:** The nav works well but could feel more premium.
+
+**Changes:**
+- Add a subtle top-border glow on the active tab (matching the primary neon color)
+- Add a badge dot on the History tab when a session was completed today
+- Slightly increase the nav height and add a frosted-glass blur effect (already partially done with `backdrop-blur-lg`, enhance it)
+
+---
+
+## 6. Home Page Dashboard Refinements
+
+**Current issue:** The home page is functional but the quick-stats row and nav cards are plain.
+
+**Changes:**
+- Add mini sparkline charts (7-day trend) inside the "Volume (wk)" stat card using a tiny recharts `<Sparkline>`
+- Add a greeting based on time of day ("Good morning", "Good evening")
+- Animate the streak counter with a flame pulse animation
+- Add a "Last workout X days ago" subtle reminder if more than 2 days since last session
+
+---
+
+## 7. Improved Onboarding
+
+**Current issue:** Onboarding is functional but minimal.
+
+**Changes:**
+- Add a "Skip all" link on step 1 for users who want defaults
+- Add unit toggle (kg/lbs) on the 1RM step
+- Add subtle background gradient animation on the welcome step
+- Pre-fill macro suggestions based on common templates (e.g., "Bulking", "Cutting", "Maintenance" presets)
+
+---
+
+## 8. Pull-to-Refresh Pattern
+
+**Changes:**
+- Add a pull-to-refresh visual indicator on the Home page that re-calculates today's stats
+- Implemented via a simple touch-gesture handler + rotation animation on refresh icon
+
+---
+
+## 9. Accessibility and Touch Improvements
+
+**Changes:**
+- Ensure all interactive elements have visible focus rings (already good with shadcn defaults, audit for custom buttons)
+- Add `aria-label` to icon-only buttons (back arrows, info icons)
+- Increase contrast on `text-[10px]` labels -- bump to `text-[11px]` with slightly less muted color
+- Add `role="progressbar"` with `aria-valuenow` to all Progress components
+
+---
+
+## 10. Dark/Light Theme Polish
+
+**Current issue:** Light mode exists but may not feel as polished as dark mode.
+
+**Changes:**
+- Audit light mode card shadows (add subtle `shadow-sm` to cards in light mode)
+- Ensure neon colors have sufficient contrast in light mode
+- Add a smooth color-scheme transition (`transition-colors duration-300` on body)
+
+---
+
+## Technical Approach
+
+### New Components
+- `src/components/PageHeader.tsx` -- Reusable header with back nav, title, right action slot
+- `src/components/EmptyState.tsx` -- Reusable empty state with icon, message, CTA
+- `src/components/CircularProgress.tsx` -- SVG-based circular timer for rest screen
+
+### Modified Files
+- `src/components/layout/AppLayout.tsx` -- AnimatePresence wrapper
+- `src/components/layout/BottomNav.tsx` -- Glow effect, badge dot, height tweak
+- `src/pages/HomePage.tsx` -- Greeting, sparkline, last-workout reminder, streak animation
+- `src/pages/SessionPage.tsx` -- Circular timer, vibration, PR confetti, set animation
+- `src/pages/SessionCompletePage.tsx` -- Confetti on mount, share button
+- `src/pages/HistoryPage.tsx` -- Empty state
+- `src/pages/RecordsPage.tsx` -- Empty state for PRs and measurements tabs
+- `src/pages/NutritionPage.tsx` -- Empty state
+- `src/pages/OnboardingPage.tsx` -- Skip all, unit toggle, macro presets, background animation
+- `src/pages/SettingsPage.tsx` -- Unit preference (kg/lbs)
+- `src/index.css` -- Theme transition, confetti keyframes, circular progress styles
+- `tailwind.config.ts` -- Any new animation keyframes
+
+### No New Dependencies
+All changes use existing libraries (framer-motion, recharts, lucide-react, tailwind).
