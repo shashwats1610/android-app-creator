@@ -2,7 +2,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Pencil } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -15,9 +15,14 @@ export default function WorkoutPage() {
 
   return (
     <motion.div className="flex flex-col gap-4 p-4 pt-6" variants={container} initial="hidden" animate="show">
-      <motion.div variants={item}>
-        <h1 className="font-display text-2xl font-bold">Workout Plan</h1>
-        <p className="text-sm text-muted-foreground">{workoutPlan.name}</p>
+      <motion.div variants={item} className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Workout Plan</h1>
+          <p className="text-sm text-muted-foreground">{workoutPlan.name}</p>
+        </div>
+        <Button variant="outline" size="sm" className="touch-target" onClick={() => navigate('/workout/edit')}>
+          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit Plan
+        </Button>
       </motion.div>
 
       {workoutPlan.days.map((day, idx) => {
