@@ -13,6 +13,7 @@ import type {
   HydrationEntry,
   MacroTargets,
   EstimatedMaxes,
+  MealTemplate,
 } from '@/types/workout';
 import { defaultWorkoutPlan } from '@/data/workoutPlan';
 
@@ -70,6 +71,9 @@ interface AppActions {
   // Nutrition
   updateDailyNutrition: (date: string, nutrition: DailyNutrition) => void;
 
+  // Meal Templates
+  saveMealTemplates: (templates: MealTemplate[]) => void;
+
   // Hydration
   addHydrationEntry: (date: string, entry: HydrationEntry) => void;
   updateDailyHydrationGoal: (goal: number) => void;
@@ -95,6 +99,13 @@ export const useAppStore = create<Store>()(
       dailyHydration: {},
       inProgressSession: null,
       streak: 0,
+      mealTemplates: [
+        { id: 'mt1', name: 'Meal 1 — Breakfast' },
+        { id: 'mt2', name: 'Meal 2 — Pre-Workout', isPreWorkout: true },
+        { id: 'mt3', name: 'Meal 3 — Post-Workout', isPostWorkout: true },
+        { id: 'mt4', name: 'Meal 4 — Dinner' },
+        { id: 'mt5', name: 'Meal 5 — Night Snack' },
+      ],
 
       // Settings
       updateSettings: (partial) =>
@@ -252,10 +263,14 @@ export const useAppStore = create<Store>()(
         })),
 
       // Nutrition
+      // Nutrition
       updateDailyNutrition: (date, nutrition) =>
         set((s) => ({
           dailyNutrition: { ...s.dailyNutrition, [date]: nutrition },
         })),
+
+      // Meal Templates
+      saveMealTemplates: (templates) => set({ mealTemplates: templates }),
 
       // Hydration
       addHydrationEntry: (date, entry) =>
@@ -281,8 +296,8 @@ export const useAppStore = create<Store>()(
 
       // Data management
       exportData: () => {
-        const { settings, workoutPlan, sessions, personalRecords, bodyMeasurements, dailyNutrition, dailyHydration, streak } = get();
-        return JSON.stringify({ settings, workoutPlan, sessions, personalRecords, bodyMeasurements, dailyNutrition, dailyHydration, streak }, null, 2);
+        const { settings, workoutPlan, sessions, personalRecords, bodyMeasurements, dailyNutrition, dailyHydration, streak, mealTemplates } = get();
+        return JSON.stringify({ settings, workoutPlan, sessions, personalRecords, bodyMeasurements, dailyNutrition, dailyHydration, streak, mealTemplates }, null, 2);
       },
 
       importData: (json) => {
@@ -297,6 +312,7 @@ export const useAppStore = create<Store>()(
             dailyNutrition: data.dailyNutrition ?? {},
             dailyHydration: data.dailyHydration ?? {},
             streak: data.streak ?? 0,
+            mealTemplates: data.mealTemplates ?? [],
           });
           return true;
         } catch {
@@ -315,6 +331,13 @@ export const useAppStore = create<Store>()(
           dailyHydration: {},
           inProgressSession: null,
           streak: 0,
+          mealTemplates: [
+            { id: 'mt1', name: 'Meal 1 — Breakfast' },
+            { id: 'mt2', name: 'Meal 2 — Pre-Workout', isPreWorkout: true },
+            { id: 'mt3', name: 'Meal 3 — Post-Workout', isPostWorkout: true },
+            { id: 'mt4', name: 'Meal 4 — Dinner' },
+            { id: 'mt5', name: 'Meal 5 — Night Snack' },
+          ],
         }),
     }),
     {
