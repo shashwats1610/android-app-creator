@@ -16,6 +16,8 @@ import SettingsPage from "@/pages/SettingsPage";
 import NutritionPage from "@/pages/NutritionPage";
 import EditPlanPage from "@/pages/EditPlanPage";
 import EditDayPage from "@/pages/EditDayPage";
+import SessionPage from "@/pages/SessionPage";
+import SessionCompletePage from "@/pages/SessionCompletePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +47,8 @@ function AppRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/nutrition" element={<NutritionPage />} />
       </Route>
+      <Route path="/session" element={<SessionPage />} />
+      <Route path="/session/complete" element={<SessionCompletePage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
